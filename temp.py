@@ -1,68 +1,35 @@
-from tkinter import *   # from x import * is bad practice
-from tkinter.ttk import *
+from tkinter import *
+from tkinter import ttk
 
-# http://tkinter.unpythonic.net/wiki/VerticalScrolledFrame
+my_window = Tk()
+# frame_name = Frame(my_window)
 
-class VerticalScrolledFrame(Frame):
-    """A pure Tkinter scrollable frame that actually works!
-    * Use the 'interior' attribute to place widgets inside the scrollable frame
-    * Construct and pack/place/grid normally
-    * This frame only allows vertical scrolling
-
-    """
-    def __init__(self, parent, *args, **kw):
-        Frame.__init__(self, parent, *args, **kw)            
-
-        # create a canvas object and a vertical scrollbar for scrolling it
-        vscrollbar = Scrollbar(self, orient=VERTICAL)
-        vscrollbar.pack(fill=Y, side=RIGHT, expand=FALSE)
-        canvas = Canvas(self, bd=0, highlightthickness=0,
-                        yscrollcommand=vscrollbar.set)
-        canvas.pack(side=LEFT, fill=BOTH, expand=TRUE)
-        vscrollbar.config(command=canvas.yview)
-
-        # reset the view
-        canvas.xview_moveto(0)
-        canvas.yview_moveto(0)
-
-        # create a frame inside the canvas which will be scrolled with it
-        self.interior = interior = Frame(canvas)
-        interior_id = canvas.create_window(0, 0, window=interior,
-                                           anchor=NW)
-
-        # track changes to the canvas and frame width and sync them,
-        # also updating the scrollbar
-        def _configure_interior(event):
-            # update the scrollbars to match the size of the inner frame
-            size = (interior.winfo_reqwidth(), interior.winfo_reqheight())
-            canvas.config(scrollregion="0 0 %s %s" % size)
-            if interior.winfo_reqwidth() != canvas.winfo_width():
-                # update the canvas's width to fit the inner frame
-                canvas.config(width=interior.winfo_reqwidth())
-        interior.bind('<Configure>', _configure_interior)
-
-        def _configure_canvas(event):
-            if interior.winfo_reqwidth() != canvas.winfo_width():
-                # update the inner frame's width to fill the canvas
-                canvas.itemconfigure(interior_id, width=canvas.winfo_width())
-        canvas.bind('<Configure>', _configure_canvas)
+my_list = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11',
+           '12', '13', '14', '15', '16', '17', '18', '19', '20']
+my_list2 = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11',
+            '12', '13', '14', '15', '16', '17', '18', '19', '20']
 
 
-if __name__ == "__main__":
+main_frame = Frame(my_window)
+main_frame.grid(row=0, column=0, sticky="nswe")
 
-    class SampleApp(Tk):
-        def __init__(self, *args, **kwargs):
-            root = Tk.__init__(self, *args, **kwargs)
+left_frame = Frame(main_frame)
+left_frame.grid(row=0, column=0, sticky="nswe")
 
+# Button added just to see that there is a left frame, otherwise it will shrink
+button_object = Button(left_frame, text="My Button")
+button_object.grid(row=0, column=0)
 
-            self.frame = VerticalScrolledFrame(root)
-            self.frame.pack()
-            self.label = Label(text="Shrink the window to activate the scrollbar.")
-            self.label.pack()
-            buttons = []
-            for i in range(10):
-                buttons.append(Button(self.frame.interior, text="Button " + str(i)))
-                buttons[-1].pack()
+right_frame = Frame(main_frame)
+right_frame.grid(row=0, column=1, sticky="nswe")
 
-    app = SampleApp()
-    app.mainloop()
+listbox_object = Listbox(right_frame)
+listbox_object2 = Listbox(right_frame)
+listbox_object.grid(row=0, column=0)
+listbox_object2.grid(row=0, column=2)
+
+scrollbar_object = Scrollbar(right_frame)
+scrollbar_object2 = Scrollbar(right_frame)
+scrollbar_object.grid(row=0, column=1, sticky='ns')
+scrollbar_object2.grid(row=0, column=3, sticky='ns')
+mainloop()
