@@ -8,6 +8,7 @@ import library as lib
 import tkinter as tk
 import tkinter.ttk as ttk
 from tkinter import messagebox as mb
+from tkinter import filedialog as fd
 
 # class MenuTable(ttk.Frame(width=500, height=600)):
 
@@ -168,6 +169,32 @@ class table_manage(ttk.Frame):
             self.widgets_entry_insert[i] = ttk.Entry(menu)
             self.widgets_entry_insert[i].grid(column=1, row=3+i, padx=10, pady=10)
 
+        label_save_as = ttk.Label(menu, text="Сохранить как: ")
+        label_save_as.grid(column=0, row=self.df.shape[1]+3, padx=10, pady=1)
+
+        button_save_csv = ttk.Button(menu, text=".csv", command=self.save_as_csv)
+        button_save_csv.grid(column=1, row=self.df.shape[1]+3, padx=10, pady=10)
+
+        button_save_xlsx = ttk.Button(menu, text=".xlsx", command=self.save_as_xlsx)
+        button_save_xlsx.grid(column=2, row=self.df.shape[1]+3, padx=10, pady=10)
+
+    def save_as_csv(self):
+        file_name = fd.asksaveasfilename(
+        filetypes=(("CSV files", "*.csv"),
+                   ("All files", "*.*")))
+        f = open(file_name, 'w')
+        self.df.to_csv(file_name, sep = ",", index = False)
+        f.close()
+
+    def save_as_xlsx(self):
+        file_name = fd.asksaveasfilename(
+        filetypes=(("Excel files", "*.xls"),
+                   ("All files", "*.*")))
+        f = open(file_name, 'w')
+        writer = pd.ExcelWriter(file_name, engine='xlsxwriter')
+        self.df.to_excel(writer, index = False)
+        writer.save()
+        f.close()
 
     def delete(self):
         self.df = self.df.drop(index=[int(self.entry_to_delete.get())])
@@ -184,7 +211,8 @@ class table_manage(ttk.Frame):
                 self.df.iloc[i, j] = self.widgets_entry[i, j].get() 
         print(self.df)
         self.initTable()
-
+    
+    
    
 def main():
     df_tracks = pd.read_excel("data/tracks.xlsx")
@@ -194,6 +222,7 @@ def main():
 
     root = tk.Tk()
     root.geometry('1000x600+200+150')
+    root.title("Менеджер")
     n = ttk.Notebook(root, width=root.winfo_screenwidth(), height=root.winfo_screenheight())
 
     tracks = table_manage(root, df_tracks)
