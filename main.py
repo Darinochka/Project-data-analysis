@@ -7,6 +7,7 @@ import matplotlib as mlt
 import library as lib
 import tkinter as tk
 import tkinter.ttk as ttk
+from tkinter import messagebox as mb
 
 # class MenuTable(ttk.Frame(width=500, height=600)):
 
@@ -73,13 +74,13 @@ class table_manage(ttk.Frame):
 
         self.grid(column=0, row=0)
 
-        self.hight = df.shape[0]
-        self.width = df.shape[1]
+        self.hight = df.shape[0] #quantity of the rows
+        self.width = df.shape[1] #quantity of the columns
 
-        self.widgets_entry = np.empty(shape=(self.hight, self.width), dtype="O")
-        self.values_df = np.empty(shape=(self.hight, self.width), dtype="O")
-        self.rows_numbers = np.empty(shape=self.hight, dtype="O")
-        self.widgets_entry_insert = np.empty(shape=(self.df.shape[1]), dtype="O")
+        self.widgets_entry = np.empty(shape=(self.hight, self.width), dtype="O")    #widgets to show values of the table
+        self.values_df = np.empty(shape=(self.hight, self.width), dtype="O")        #values of the table
+        self.rows_numbers = np.empty(shape=self.hight, dtype="O")                   #array for keeping the numbers of the rows
+        self.widgets_entry_insert = np.empty(shape=(self.df.shape[1]), dtype="O")   #wodgets for insert in the table
 
         self.initTable()
         self.initMenu()
@@ -89,11 +90,15 @@ class table_manage(ttk.Frame):
         self.rowconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1, uniform="group1")
         # self.rowconfigure(1, weight=1)
-
+    
     def initTable(self):
 
         self.hight = self.df.shape[0]
         self.width = self.df.shape[1]
+
+        self.widgets_entry = np.empty(shape=(self.hight, self.width), dtype="O")
+        self.values_df = np.empty(shape=(self.hight, self.width), dtype="O")
+        self.rows_numbers = np.empty(shape=self.hight, dtype="O")
 
         #frame with table
         frame = ttk.Frame(self, relief="ridge")
@@ -116,6 +121,7 @@ class table_manage(ttk.Frame):
         sizegrip.pack(in_ = scrollbar_x, side="bottom", anchor="se")
         canvas.pack(side="left", fill="both", expand=True)
         
+        #creating the table
         for i in range(self.hight): 
             for j, column in enumerate(self.df.columns):
 
@@ -124,8 +130,8 @@ class table_manage(ttk.Frame):
 
                 self.values_df[i, j] = tk.StringVar()
 
-                if j == 0:
-                    self.rows_numbers[i] = ttk.Label(scrollable_frame, text=i)
+                if j == 0:                                                      #creating lables for numbers of the rows
+                    self.rows_numbers[i] = ttk.Label(scrollable_frame, text=i)      
                     self.rows_numbers[i].grid(row=i+1, column=j)
                 
                 self.widgets_entry[i, j] = tk.Entry(scrollable_frame, textvariable = self.values_df[i, j])
@@ -146,22 +152,21 @@ class table_manage(ttk.Frame):
         label_delete.grid(column=0, row=1, padx=10, pady=10)
 
         self.entry_to_delete = ttk.Entry(menu)
-        self.entry_to_delete.grid(column=1, row=2, padx=10, pady=10)
+        self.entry_to_delete.grid(column=1, row=1, padx=10, pady=10)
 
         button_delete = ttk.Button(menu, text="Удалить", command=self.delete)
-        button_delete.grid(column=2, row=2, padx=10, pady=10)
+        button_delete.grid(column=2, row=1, padx=10, pady=10)
 
         label_delete = ttk.Label(menu, text="Введите данные строчки для добавления: ")
-        label_delete.grid(column=0, row=3, padx=10, pady=10)
+        label_delete.grid(column=0, row=2, padx=10, pady=10)
 
         for i, column in enumerate(self.df.columns):
             label_column = ttk.Label(menu, text=column)
-            label_column.grid(column=0, row=4+i, padx=10, pady=10)
+            label_column.grid(column=0, row=3+i, padx=10, pady=10)
 
         for i in range(self.df.shape[1]):
-            entry_insert = ttk.Entry(menu)
-            self.widgets_entry_insert[i] = entry_insert
-            self.widgets_entry_insert[i].grid(column=1, row=4+i, padx=10, pady=10)
+            self.widgets_entry_insert[i] = ttk.Entry(menu)
+            self.widgets_entry_insert[i].grid(column=1, row=3+i, padx=10, pady=10)
 
 
     def delete(self):
@@ -172,14 +177,15 @@ class table_manage(ttk.Frame):
 
     def save(self):
         hight = self.hight
+        
         for i in range(self.hight): 
-            for j in range(self.width): 
-                self.df.iloc[hight, j] = self.widgets_entry_insert[j].get()
+            for j, column in enumerate(self.df.columns): 
+                self.df.loc[hight, column] = self.widgets_entry_insert[j].get()
                 self.df.iloc[i, j] = self.widgets_entry[i, j].get() 
         print(self.df)
         self.initTable()
 
-        
+   
 def main():
     df_tracks = pd.read_excel("data/tracks.xlsx")
     df_albums = pd.read_excel("data/albums.xlsx")
