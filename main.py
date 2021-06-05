@@ -79,7 +79,8 @@ class table_manage(ttk.Frame):
         self.widgets_entry = np.empty(shape=(self.hight, self.width), dtype="O")
         self.values_df = np.empty(shape=(self.hight, self.width), dtype="O")
         self.rows_numbers = np.empty(shape=self.hight, dtype="O")
-       
+        self.widgets_entry_insert = np.empty(shape=(self.df.shape[1]), dtype="O")
+
         self.initTable()
         self.initMenu()
 
@@ -90,6 +91,10 @@ class table_manage(ttk.Frame):
         # self.rowconfigure(1, weight=1)
 
     def initTable(self):
+
+        self.hight = self.df.shape[0]
+        self.width = self.df.shape[1]
+
         #frame with table
         frame = ttk.Frame(self, relief="ridge")
         frame.grid(column=0, row=0, sticky="nsew")
@@ -135,13 +140,29 @@ class table_manage(ttk.Frame):
         menu.grid(column=1, row=0, sticky="nsew")
         
         button_save = ttk.Button(menu, text="Применить", command=self.save)
-        button_save.grid(column=0, row=0)
+        button_save.grid(column=0, row=0, padx=10, pady=10)
+
+        label_delete = ttk.Label(menu, text="Введите номер строчки для удаления: ")
+        label_delete.grid(column=0, row=1, padx=10, pady=10)
 
         self.entry_to_delete = ttk.Entry(menu)
-        button_delete = ttk.Button(menu, text="Удалить", command=self.delete)
+        self.entry_to_delete.grid(column=1, row=2, padx=10, pady=10)
 
-        self.entry_to_delete.grid(column=0, row=1)
-        button_delete.grid(column=1, row=1)
+        button_delete = ttk.Button(menu, text="Удалить", command=self.delete)
+        button_delete.grid(column=2, row=2, padx=10, pady=10)
+
+        label_delete = ttk.Label(menu, text="Введите данные строчки для добавления: ")
+        label_delete.grid(column=0, row=3, padx=10, pady=10)
+
+        for i, column in enumerate(self.df.columns):
+            label_column = ttk.Label(menu, text=column)
+            label_column.grid(column=0, row=4+i, padx=10, pady=10)
+
+        for i in range(self.df.shape[1]):
+            entry_insert = ttk.Entry(menu)
+            self.widgets_entry_insert[i] = entry_insert
+            self.widgets_entry_insert[i].grid(column=1, row=4+i, padx=10, pady=10)
+
 
     def delete(self):
         self.df = self.df.drop(index=[int(self.entry_to_delete.get())])
@@ -150,8 +171,10 @@ class table_manage(ttk.Frame):
         self.initTable()
 
     def save(self):
+        hight = self.hight
         for i in range(self.hight): 
             for j in range(self.width): 
+                self.df.iloc[hight, j] = self.widgets_entry_insert[j].get()
                 self.df.iloc[i, j] = self.widgets_entry[i, j].get() 
         print(self.df)
         self.initTable()
