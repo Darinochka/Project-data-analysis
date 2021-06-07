@@ -10,6 +10,7 @@ import tkinter as tk
 import tkinter.ttk as ttk
 from tkinter import messagebox as mb
 from tkinter import filedialog as fd
+import random as rd
 from datetime import datetime
 
         
@@ -138,18 +139,10 @@ class table_manage(ttk.Frame):
         button_save_pic = ttk.Button(menu, text=".pic", command=self.save_as_pic)
         button_save_pic.grid(column=3, row=self.width+3, padx=10, pady=10)
 
-    def save_as_pic(self):
-        file_name = fd.asksaveasfilename(
-        filetypes=(("Picle files", "*.pic"),
-                   ("All files", "*.*")))
-        f = open(file_name, 'w')
-        self.df.to_pickle(file_name)
-        f.close()
-
-        f_default = open(self.file+f"{datetime.now().time()}.pic", 'w')
-        print(self.file+f"{datetime.now()}")
-        self.df.to_pickle(f_default)
-        f_default.close()
+    def save_default(self, format):
+        file_name_default = datetime.now().strftime("%Y%m%d-%H%M%S")
+        f_default = open(self.file+file_name_default+format, 'w', encoding='utf-8')
+        return f_default
 
     def save_as_csv(self):
         file_name = fd.asksaveasfilename(
@@ -159,9 +152,7 @@ class table_manage(ttk.Frame):
         self.df.to_csv(file_name, sep = ",", index = False)
         f.close()
 
-        f_default = open(self.file+f"{datetime.now()}", 'w')
-        self.df.to_csv(f_default)
-        f_default.close()
+        self.df.to_csv(self.save_default(".csv"), index = False)
 
     def save_as_xlsx(self):
         file_name = fd.asksaveasfilename(
@@ -169,14 +160,22 @@ class table_manage(ttk.Frame):
                    ("All files", "*.*")))
         f = open(file_name, 'w')
         writer = pd.ExcelWriter(file_name, engine='xlsxwriter')
-        self.df.to_excel(writer, index = False)
+        self.df.to_excel(writer, index = False, encoding='utf-8')
         writer.save()
         f.close()
 
-        f_default = open(self.file+f"{datetime.now()}", 'w')
-        writer = pd.ExcelWriter(f_default, engine='xlsxwriter')
-        self.df.to_excel(writer, index = False)
-        f_default.close()
+        file_name_default = datetime.now().strftime("%Y%m%d-%H%M%S")
+        self.df.to_excel(self.file+file_name_default+".xlsx", index = False)
+    
+    def save_as_pic(self):
+        file_name = fd.asksaveasfilename(
+        filetypes=(("Picle files", "*.pic"),
+                   ("All files", "*.*")))
+        f = open(file_name, 'w')
+        self.df.to_pickle(file_name)
+        f.close()
+
+        self.df.to_pickle(self.save_default(".pic"), index=False)
 
     def delete(self):
         entry = self.entry_to_delete.get()
@@ -220,7 +219,7 @@ class table_manage(ttk.Frame):
     
    
 def main():
-    file_name = "output/"
+    file_path = "output/"
     df_tracks = pd.read_excel("data/tracks.xlsx")
     df_albums = pd.read_excel("data/albums.xlsx")
     df_artists = pd.read_excel("data/artists.xlsx")
@@ -231,10 +230,10 @@ def main():
     root.title("Менеджер")
     n = ttk.Notebook(root, width=root.winfo_screenwidth(), height=root.winfo_screenheight())
 
-    tracks = table_manage(root, df_tracks, file_name)
-    albums = table_manage(root, df_albums, file_name)
-    artists = table_manage(root, df_artists, file_name)
-    genres = table_manage(root, df_genres, file_name)
+    tracks = table_manage(root, df_tracks, file_path)
+    albums = table_manage(root, df_albums, file_path)
+    artists = table_manage(root, df_artists, file_path)
+    genres = table_manage(root, df_genres, file_path)
 
 
     n.add(tracks, text='Треки')
