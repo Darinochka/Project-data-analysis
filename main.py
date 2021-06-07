@@ -65,11 +65,11 @@ class table(ttk.Frame):
                 
 class table_manage(ttk.Frame):
  
-    def __init__(self, parent, df, file):
+    def __init__(self, parent, df, file_path):
         super().__init__(parent)
         self.df = df
-        self.file = file #file name for default saving
-
+        self.file_path = file_path #file name for default saving
+        self.df_types = [x for x in df.dtypes]
         self.grid(column=0, row=0)
 
         self.hight = df.shape[0]
@@ -141,7 +141,7 @@ class table_manage(ttk.Frame):
 
     def save_default(self, format):
         file_name_default = datetime.now().strftime("%Y%m%d-%H%M%S")
-        f_default = open(self.file+file_name_default+format, 'w', encoding='utf-8')
+        f_default = open(self.file_path+file_name_default+format, 'w', encoding='utf-8')
         return f_default
 
     def save_as_csv(self):
@@ -165,7 +165,7 @@ class table_manage(ttk.Frame):
         f.close()
 
         file_name_default = datetime.now().strftime("%Y%m%d-%H%M%S")
-        self.df.to_excel(self.file+file_name_default+".xlsx", index = False)
+        self.df.to_excel(self.file_path+file_name_default+".xlsx", index = False)
     
     def save_as_pic(self):
         file_name = fd.asksaveasfilename(
@@ -196,26 +196,55 @@ class table_manage(ttk.Frame):
             entries[i].delete(0, 'end')
 
     def save_insert(self):
-        for j in range(self.width):
-            if not self.widgets_entry_insert[j].get():
-                mb.showerror(
-                        "Ошибка", 
-                        "Твое поле пустое!")
-                return 0
+        self.hight = self.df.shape[0]
+        self.width = self.df.shape[1]
 
-        for j, column in enumerate(self.df.columns): 
-            self.df.loc[self.hight, column] = self.widgets_entry_insert[j].get()
+        try:
+            for j in range(self.width): #check empty entries
+                if not self.widgets_entry_insert[j].get():
+                    raise ValueError
+            print(self.df.dtypes)           
+            for j, column in enumerate(self.df.columns): 
+                entry = self.widgets_entry_insert[j].get()
 
-        self.initTable()
+                if self.df_types[j] == np.dtype('int64'):
+                    entry = int(self.widgets_entry_insert[j].get())
+                elif self.df_types[j] == np.dtype('datetime64[ns]'):
+                    entry = datetime.strptime(self.widgets_entry_insert[j].get(), "%Y-%m-%d")
+
+                self.df.loc[self.hight, column] = self.widgets_entry_insert[j].get()
+            print(self.df)
+            print(self.df.dtypes)
+            self.initTable()
+        except ValueError:
+            mb.showerror(
+                "Ошибка", 
+                "Ты ввел данные не того типа!")
         self.clear(self.widgets_entry_insert)
         
 
     def save_changes(self):
-        for i in range(self.hight): 
-            for j in range(self.width): 
-                self.df.iloc[i, j] = self.widgets_entry[i, j].get() 
-        print(self.df)
-        self.initTable()
+        self.hight = self.df.shape[0]
+        self.width = self.df.shape[1]
+
+        try:
+            for i in range(self.hight): 
+                for j in range(self.width): 
+                    entry = self.widgets_entry[i, j].get()
+
+                    if self.df_types[j] == np.dtype('int64'):
+                        entry = int(self.widgets_entry[i, j].get())
+                    elif self.df_types[j] == np.dtype('datetime64[ns]'):
+                        entry = datetime.strptime(self.widgets_entry[i, j].get(), "%Y-%m-%d")
+
+                self.df.iloc[i, j] = entry
+            print(self.df)
+            self.initTable()
+        except ValueError:
+            mb.showerror(
+                "Ошибка", 
+                "Ты ввел данные не того типа!")
+
     
    
 def main():
