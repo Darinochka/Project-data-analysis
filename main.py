@@ -26,8 +26,7 @@ class table(ttk.Frame):
         self.width = df.shape[1]
 
         self.widgets_entry = np.empty(shape=(self.hight, self.width), dtype="O")    
-        self.values_df = np.empty(shape=(self.hight, self.width), dtype="O")        
-        self.rows_numbers = np.empty(shape=self.hight, dtype="O")                  
+        self.values_df = np.empty(shape=(self.hight, self.width), dtype="O")                        
 
         canvas = tk.Canvas(self)
         scrollbar_x = ttk.Scrollbar(self, orient=tk.HORIZONTAL, command=canvas.xview)
@@ -54,8 +53,8 @@ class table(ttk.Frame):
                 self.values_df[i, j] = tk.StringVar()
 
                 if j == 0:                                                      #creating lables for numbers of the rows
-                    self.rows_numbers[i] = ttk.Label(scrollable_frame, text=i)      
-                    self.rows_numbers[i].grid(row=i+1, column=j)
+                    label_num_row = ttk.Label(scrollable_frame, text=i)      
+                    label_num_row.grid(row=i+1, column=j)
                 
                 self.widgets_entry[i, j] = tk.Entry(scrollable_frame, textvariable = self.values_df[i, j])
                 self.widgets_entry[i, j].grid(row=i+1, column=j+1)
@@ -77,7 +76,6 @@ class table_manage(ttk.Frame):
 
         self.widgets_entry = np.empty(shape=(self.hight, self.width), dtype="O")    #widgets to show values of the table
         self.values_df = np.empty(shape=(self.hight, self.width), dtype="O")        #values of the table
-        self.rows_numbers = np.empty(shape=self.hight, dtype="O")                   #array for keeping the numbers of the rows
         self.widgets_entry_insert = np.empty(shape=(self.df.shape[1]), dtype="O")   #widgets for insert in the table
 
         self.initTable()
@@ -94,7 +92,6 @@ class table_manage(ttk.Frame):
 
         self.widgets_entry = frame.widgets_entry
         self.values_df = frame.values_df
-        self.rows_numbers = frame.rows_numbers
                 
     def initMenu(self):
         #editor table
@@ -181,15 +178,15 @@ class table_manage(ttk.Frame):
         entry = self.entry_to_delete.get()
         try:
             self.df = self.df.drop(index=[int(entry)])
-            self.rows_numbers = np.delete(self.rows_numbers, -1)
-            print(self.df)
 
-            self.entry_to_delete.delete(0, 'end')
+            self.df = self.df.reset_index(drop=True)
+            print(self.df)
             self.initTable()
         except (ValueError,KeyError):
             mb.showerror(
                 "Ошибка", 
                 "Ты ввел неверные данные!")
+        self.entry_to_delete.delete(0, 'end')
 
     def clear(self, entries):
         for i in range(len(entries)):
@@ -198,12 +195,11 @@ class table_manage(ttk.Frame):
     def save_insert(self):
         self.hight = self.df.shape[0]
         self.width = self.df.shape[1]
-
+        
         try:
             for j in range(self.width): #check empty entries
                 if not self.widgets_entry_insert[j].get():
-                    raise ValueError
-            print(self.df.dtypes)           
+                    raise ValueError         
             for j, column in enumerate(self.df.columns): 
                 entry = self.widgets_entry_insert[j].get()
 
@@ -212,16 +208,24 @@ class table_manage(ttk.Frame):
                 elif self.df_types[j] == np.dtype('datetime64[ns]'):
                     entry = datetime.strptime(self.widgets_entry_insert[j].get(), "%Y-%m-%d")
 
-                self.df.loc[self.hight, column] = self.widgets_entry_insert[j].get()
+                self.df.loc[self.hight, column] = entry
+
+            self.df = self.transform_type(self.df, self.df_types)
+            self.df = self.df.reset_index(drop=True)
             print(self.df)
-            print(self.df.dtypes)
             self.initTable()
+
         except ValueError:
             mb.showerror(
                 "Ошибка", 
                 "Ты ввел данные не того типа!")
+                
         self.clear(self.widgets_entry_insert)
         
+    def transform_type(self, df, df_types):
+        for i, column in enumerate(df.columns):
+            df = df.astype({column:df_types[i]})
+        return df
 
     def save_changes(self):
         self.hight = self.df.shape[0]
@@ -237,7 +241,9 @@ class table_manage(ttk.Frame):
                     elif self.df_types[j] == np.dtype('datetime64[ns]'):
                         entry = datetime.strptime(self.widgets_entry[i, j].get(), "%Y-%m-%d")
 
-                self.df.iloc[i, j] = entry
+                    self.df.iloc[i, j] = entry
+
+            self.df = self.transform_type(self.df, self.df_types)
             print(self.df)
             self.initTable()
         except ValueError:
@@ -246,7 +252,6 @@ class table_manage(ttk.Frame):
                 "Ты ввел данные не того типа!")
 
     
-   
 def main():
     file_path = "output/"
     df_tracks = pd.read_excel("data/tracks.xlsx")
