@@ -1,20 +1,16 @@
-import os
-import sys
-from numpy.core.numeric import identity
-from numpy.lib import stride_tricks
 import pandas as pd 
 import numpy as np
 import matplotlib as mlt
-import library as lib
+from library import rep
 import tkinter as tk
 import tkinter.ttk as ttk
-from tkinter import messagebox as mb
+from tkinter import BooleanVar, messagebox as mb
 from tkinter import filedialog as fd
 import random as rd
 from datetime import datetime
 
-        
-class table(ttk.Frame):
+
+class Table(ttk.Frame):
 
     def __init__(self, parent, df):
         super().__init__(parent)
@@ -61,8 +57,68 @@ class table(ttk.Frame):
 
                 cnt = self.df.iloc[i, j]
                 self.values_df[i, j].set(str(cnt))
-                
-class table_manage(ttk.Frame):
+
+class SampleData(ttk.Frame):
+
+    def __init__(self, parent, df_list, df_names, file_path):
+        super().__init__(parent)
+        self.file_path = file_path
+        self.df_names = df_names
+        self.df_list = df_list
+        self.df_curr = self.df_list[0]
+
+        self.choice_data = tk.IntVar()
+        self.choice_data.set(0)
+
+        self.choice_attr = np.empty(shape=(self.df_curr.shape[1]), dtype="O")
+
+        self.grid(column=0, row=0)
+
+        self.init_manager()
+        self.init_table(self.df_curr)
+
+        self.grid_columnconfigure(0, weight=1, uniform="group1")
+        self.rowconfigure(0, weight=1)
+        self.grid_columnconfigure(1, weight=1, uniform="group1")
+
+    def init_table(self, df):
+        table = Table(self, df)
+        table.grid(column=0, row=0, sticky="nsew")
+
+    def change_main_base(self):
+        self.df_curr = self.df_list[self.choice_data.get()]
+        self.init_table(self.df_curr)
+        self.init_manager()
+
+    def init_manager(self):
+        manager = ttk.Frame(self)
+        manager.grid(column=1, row=0, sticky="nsew")
+
+        label_choose = ttk.Label(manager, text="Выберите базу данных: ")
+        label_choose.grid(column=0, row=0, padx=10, pady=10, sticky="nw")
+
+        len_df_list = len(self.df_list)
+    
+        for i in range(len_df_list):
+            radiobutton_choice = ttk.Radiobutton(manager, text=self.df_names[i], variable=self.choice_data, value=i, command=self.change_main_base)
+            radiobutton_choice.grid(column=0, row=i+1, padx=10, pady=10, sticky="nw")
+
+        label_choose_attr = ttk.Label(manager, text="Выберите атрибуты базы данных: ")
+        label_choose_attr.grid(column=0, row=len_df_list+1, padx=10, pady=10, sticky="nw")
+
+        for i, column in enumerate(self.df_curr.columns):
+            self.choice_attr[i] = tk.BooleanVar()
+            check_attr = ttk.Checkbutton(manager, text=column, onvalue=True, offvalue=False, variable=self.choice_attr[i])
+            check_attr.grid(column=0, row=len_df_list+i+2, padx=10, pady=10, sticky="nw")
+        
+        button_change = ttk.Button(manager, text="Применить", command=self.save_change)
+        button_change.grid(column=0, row=len_df_list*2+1, padx=10, pady=10, sticky="nw")
+
+    def save_change(self):
+        values = [self.df_curr.columns[i] for i in range(len(self.choice_attr)) if self.choice_attr[i].get()]
+        self.init_table(self.df_curr[values])
+
+class TableManage(ttk.Frame):
  
     def __init__(self, parent, df, file_path):
         super().__init__(parent)
@@ -78,24 +134,24 @@ class table_manage(ttk.Frame):
         self.values_df = np.empty(shape=(self.hight, self.width), dtype="O")        #values of the table
         self.widgets_entry_insert = np.empty(shape=(self.df.shape[1]), dtype="O")   #widgets for insert in the table
 
-        self.initTable()
-        self.initMenu()
+        self.init_table()
+        self.init_manager()
 
         self.grid_columnconfigure(0, weight=1, uniform="group1")
         self.rowconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1, uniform="group1")
-    
-    def initTable(self):
+ 
+    def init_table(self):
 
-        frame = table(self, self.df)
-        frame.grid(column=0, row=0, sticky="nsew")
+        table = Table(self, self.df)
+        table.grid(column=0, row=0, sticky="nsew")
 
-        self.widgets_entry = frame.widgets_entry
-        self.values_df = frame.values_df
+        self.widgets_entry = table.widgets_entry
+        self.values_df = table.values_df
                 
-    def initMenu(self):
+    def init_manager(self):
         #editor table
-        menu = ttk.Frame(self, relief="ridge")
+        menu = ttk.Frame(self)
         menu.grid(column=1, row=0, sticky="nsew")
         
         button_save = ttk.Button(menu, text="Применить", command=self.save_changes)
@@ -178,10 +234,9 @@ class table_manage(ttk.Frame):
         entry = self.entry_to_delete.get()
         try:
             self.df = self.df.drop(index=[int(entry)])
-
             self.df = self.df.reset_index(drop=True)
-            print(self.df)
-            self.initTable()
+
+            self.init_table()
         except (ValueError,KeyError):
             mb.showerror(
                 "Ошибка", 
@@ -192,40 +247,53 @@ class table_manage(ttk.Frame):
         for i in range(len(entries)):
             entries[i].delete(0, 'end')
 
+    def transform_type(self, df, df_types):
+        for i, column in enumerate(df.columns):
+            df = df.astype({column:df_types[i]})
+        return df
+
     def save_insert(self):
         self.hight = self.df.shape[0]
         self.width = self.df.shape[1]
         
         try:
             for j in range(self.width): #check empty entries
-                if not self.widgets_entry_insert[j].get():
-                    raise ValueError         
-            for j, column in enumerate(self.df.columns): 
                 entry = self.widgets_entry_insert[j].get()
+                
+                if not entry:
+                    raise ValueError  
 
-                if self.df_types[j] == np.dtype('int64'):
-                    entry = int(self.widgets_entry_insert[j].get())
+                elif self.df_types[j] == np.dtype('int64'):
+                    int(entry)
+
+                elif self.df_types[j] == np.dtype('float64'):
+                    float(entry)
+
                 elif self.df_types[j] == np.dtype('datetime64[ns]'):
-                    entry = datetime.strptime(self.widgets_entry_insert[j].get(), "%Y-%m-%d")
+                    datetime.strptime(entry, "%Y-%m-%d")       
 
-                self.df.loc[self.hight, column] = entry
+            for j, column in enumerate(self.df.columns): 
+                self.df.loc[self.hight, column] = self.widgets_entry_insert[j].get()
 
             self.df = self.transform_type(self.df, self.df_types)
             self.df = self.df.reset_index(drop=True)
-            print(self.df)
-            self.initTable()
+
+            if self.df.duplicated().any():
+                self.df = self.df.drop(index=[self.hight])
+                raise Exception
+
+            self.init_table()
 
         except ValueError:
             mb.showerror(
                 "Ошибка", 
                 "Ты ввел данные не того типа!")
-                
+        except Exception:
+            mb.showerror(
+                "Ошибка", 
+                "Такая строка уже присутствует!")
+
         self.clear(self.widgets_entry_insert)
-        
-    def transform_type(self, df, df_types):
-        for i, column in enumerate(df.columns):
-            df = df.astype({column:df_types[i]})
-        return df
 
     def save_changes(self):
         self.hight = self.df.shape[0]
@@ -237,22 +305,25 @@ class table_manage(ttk.Frame):
                     entry = self.widgets_entry[i, j].get()
 
                     if self.df_types[j] == np.dtype('int64'):
-                        entry = int(self.widgets_entry[i, j].get())
+                        int(entry)
+
+                    elif self.df_types[j] == np.dtype('float64'):
+                        float(entry)
+
                     elif self.df_types[j] == np.dtype('datetime64[ns]'):
-                        entry = datetime.strptime(self.widgets_entry[i, j].get(), "%Y-%m-%d")
+                        datetime.strptime(entry, "%Y-%m-%d") 
 
                     self.df.iloc[i, j] = entry
 
             self.df = self.transform_type(self.df, self.df_types)
-            print(self.df)
-            self.initTable()
+            self.init_table()
         except ValueError:
             mb.showerror(
                 "Ошибка", 
                 "Ты ввел данные не того типа!")
 
-    
 def main():
+    print(rep.x)
     file_path = "output/"
     df_tracks = pd.read_excel("data/tracks.xlsx")
     df_albums = pd.read_excel("data/albums.xlsx")
@@ -264,20 +335,30 @@ def main():
     root.title("Менеджер")
     n = ttk.Notebook(root, width=root.winfo_screenwidth(), height=root.winfo_screenheight())
 
-    tracks = table_manage(root, df_tracks, file_path)
-    albums = table_manage(root, df_albums, file_path)
-    artists = table_manage(root, df_artists, file_path)
-    genres = table_manage(root, df_genres, file_path)
+    tracks = TableManage(root, df_tracks, file_path)
+    df_tracks = tracks.df
 
+    albums = TableManage(root, df_albums, file_path)
+    df_albums = albums.df
+
+    artists = TableManage(root, df_artists, file_path)
+    df_artists = artists.df
+
+    genres = TableManage(root, df_genres, file_path)
+    df_genres = genres.df
+
+    select_data = SampleData(root, [df_tracks, df_albums, df_artists, df_genres], ["Треки", "Альбомы", "Артисты", "Жанры"], file_path)
 
     n.add(tracks, text='Треки')
     n.add(albums, text='Альбомы')
     n.add(artists, text='Артисты')
     n.add(genres, text='Жанры')
+    n.add(select_data, text='Выборка данных')
 
     n.pack()
     root.mainloop()
- 
+    print(df_tracks)
+    
  
 if __name__ == '__main__':
     main()
