@@ -4,7 +4,7 @@ import matplotlib as mlt
 from library import rep
 import tkinter as tk
 import tkinter.ttk as ttk
-from tkinter import BooleanVar, messagebox as mb
+from tkinter import messagebox as mb
 from tkinter import filedialog as fd
 import random as rd
 from datetime import datetime
@@ -66,6 +66,7 @@ class SampleData(ttk.Frame):
         self.df_names = df_names
         self.df_list = df_list
         self.df_curr = self.df_list[0]
+        self.df_change_curr = self.df_curr
 
         self.choice_data = tk.IntVar()
         self.choice_data.set(0)
@@ -75,7 +76,6 @@ class SampleData(ttk.Frame):
         self.grid(column=0, row=0)
 
         self.init_manager()
-        self.init_table(self.df_curr)
 
         self.grid_columnconfigure(0, weight=1, uniform="group1")
         self.rowconfigure(0, weight=1)
@@ -87,6 +87,7 @@ class SampleData(ttk.Frame):
 
     def change_main_base(self):
         self.df_curr = self.df_list[self.choice_data.get()]
+        self.choice_attr = np.empty(shape=(self.df_curr.shape[1]), dtype="O")
         self.init_table(self.df_curr)
         self.init_manager()
 
@@ -98,25 +99,79 @@ class SampleData(ttk.Frame):
         label_choose.grid(column=0, row=0, padx=10, pady=10, sticky="nw")
 
         len_df_list = len(self.df_list)
-    
+        row_iter = 1
+
         for i in range(len_df_list):
             radiobutton_choice = ttk.Radiobutton(manager, text=self.df_names[i], variable=self.choice_data, value=i, command=self.change_main_base)
-            radiobutton_choice.grid(column=0, row=i+1, padx=10, pady=10, sticky="nw")
+            radiobutton_choice.grid(column=0, row=row_iter, padx=10, pady=10, sticky="nw")
+            row_iter+=1
 
         label_choose_attr = ttk.Label(manager, text="Выберите атрибуты базы данных: ")
-        label_choose_attr.grid(column=0, row=len_df_list+1, padx=10, pady=10, sticky="nw")
+        label_choose_attr.grid(column=0, row=row_iter, padx=10, pady=10, sticky="nw")
 
         for i, column in enumerate(self.df_curr.columns):
+            row_iter+=1
             self.choice_attr[i] = tk.BooleanVar()
             check_attr = ttk.Checkbutton(manager, text=column, onvalue=True, offvalue=False, variable=self.choice_attr[i])
-            check_attr.grid(column=0, row=len_df_list+i+2, padx=10, pady=10, sticky="nw")
+            check_attr.grid(column=0, row=row_iter, padx=10, pady=10, sticky="nw")
         
         button_change = ttk.Button(manager, text="Применить", command=self.save_change)
-        button_change.grid(column=0, row=len_df_list*2+1, padx=10, pady=10, sticky="nw")
+        button_change.grid(column=0, row=row_iter+1, padx=10, pady=10, sticky="nw")
+
+        label_save_as = ttk.Label(manager, text="Сохранить как: ")
+        label_save_as.grid(column=0, row=row_iter+2, padx=10, pady=10, sticky="nw")
+
+        button_save_csv = ttk.Button(manager, text=".csv", command=self.save_as_csv)
+        button_save_csv.grid(column=1, row=row_iter+2, padx=10, pady=10, sticky="e")
+
+        button_save_xlsx = ttk.Button(manager, text=".xlsx", command=self.save_as_xlsx)
+        button_save_xlsx.grid(column=2, row=row_iter+2, padx=10, pady=10)
+
+        button_save_pic = ttk.Button(manager, text=".pic", command=self.save_as_pic)
+        button_save_pic.grid(column=3, row=row_iter+2, padx=10, pady=10)
 
     def save_change(self):
         values = [self.df_curr.columns[i] for i in range(len(self.choice_attr)) if self.choice_attr[i].get()]
-        self.init_table(self.df_curr[values])
+        self.df_change_curr = self.df_curr[values]
+        self.init_table(self.df_change_curr)
+
+    def save_default(self, format):
+        file_name_default = datetime.now().strftime("%Y%m%d-%H%M%S")
+        f_default = open(self.file_path+file_name_default+format, 'w', encoding='utf-8')
+        return f_default
+
+    def save_as_csv(self):
+        file_name = fd.asksaveasfilename(
+        filetypes=(("CSV files", "*.csv"),
+                   ("All files", "*.*")))
+        f = open(file_name, 'w')
+        self.df_change_curr.to_csv(file_name, sep = ",", index = False)
+        f.close()
+
+        self.df_change_curr.to_csv(self.save_default(".csv"), index = False)
+
+    def save_as_xlsx(self):
+        file_name = fd.asksaveasfilename(
+        filetypes=(("Excel files", "*.xls"),
+                   ("All files", "*.*")))
+        f = open(file_name, 'w')
+        writer = pd.ExcelWriter(file_name, engine='xlsxwriter')
+        self.df_change_curr.to_excel(writer, index = False, encoding='utf-8')
+        writer.save()
+        f.close()
+
+        file_name_default = datetime.now().strftime("%Y%m%d-%H%M%S")
+        self.df_change_curr.to_excel(self.file_path+file_name_default+".xlsx", index = False)
+    
+    def save_as_pic(self):
+        file_name = fd.asksaveasfilename(
+        filetypes=(("Picle files", "*.pic"),
+                   ("All files", "*.*")))
+        f = open(file_name, 'w')
+        self.df_change_curr.to_pickle(file_name)
+        f.close()
+
+        self.df_change_curr.to_pickle(self.save_default(".pic"), index=False)
 
 class TableManage(ttk.Frame):
  
@@ -237,6 +292,7 @@ class TableManage(ttk.Frame):
             self.df = self.df.reset_index(drop=True)
 
             self.init_table()
+            update_df()
         except (ValueError,KeyError):
             mb.showerror(
                 "Ошибка", 
@@ -283,7 +339,7 @@ class TableManage(ttk.Frame):
                 raise Exception
 
             self.init_table()
-
+            update_df()
         except ValueError:
             mb.showerror(
                 "Ошибка", 
@@ -317,48 +373,152 @@ class TableManage(ttk.Frame):
 
             self.df = self.transform_type(self.df, self.df_types)
             self.init_table()
+            update_df()
         except ValueError:
             mb.showerror(
                 "Ошибка", 
                 "Ты ввел данные не того типа!")
 
-def main():
-    print(rep.x)
-    file_path = "output/"
-    df_tracks = pd.read_excel("data/tracks.xlsx")
-    df_albums = pd.read_excel("data/albums.xlsx")
-    df_artists = pd.read_excel("data/artists.xlsx")
-    df_genres = pd.read_excel("data/genres.xlsx")
+    def get_upd_df(self):
+        return self.df
 
-    root = tk.Tk()
-    root.geometry('1200x600+200+150')
-    root.title("Менеджер")
-    n = ttk.Notebook(root, width=root.winfo_screenwidth(), height=root.winfo_screenheight())
+class QualityData(ttk.Frame):
+    def __init__(self, parent, df_list, df_names, file_path):
+        super().__init__(parent)
+        self.df_list = df_list
+        self.file_path = file_path
+        self.df_names = df_names
+        self.df_curr = self.df_list[0]
+        self.df_types = [x for x in self.df_curr.dtypes]
+        self.choice_data = tk.IntVar()
+        self.choice_data.set(0)
 
-    tracks = TableManage(root, df_tracks, file_path)
-    df_tracks = tracks.df
+        self.choice_attr = tk.StringVar()
+        self.choice_attr.set("")
 
-    albums = TableManage(root, df_albums, file_path)
-    df_albums = albums.df
+        self.attr = np.empty(shape=(self.df_curr.shape[1]), dtype="O")
 
-    artists = TableManage(root, df_artists, file_path)
-    df_artists = artists.df
+        self.init_manager()
 
-    genres = TableManage(root, df_genres, file_path)
-    df_genres = genres.df
+        self.grid_rowconfigure(0, weight=1, uniform="group1")
+        self.columnconfigure(0, weight=1)
+        self.grid_rowconfigure(1, weight=2, uniform="group1")
 
-    select_data = SampleData(root, [df_tracks, df_albums, df_artists, df_genres], ["Треки", "Альбомы", "Артисты", "Жанры"], file_path)
+    def init_table(self, df):
+        table = Table(self, df)
+        table.grid(column=0, row=1, sticky="nsew")
 
-    n.add(tracks, text='Треки')
-    n.add(albums, text='Альбомы')
-    n.add(artists, text='Артисты')
-    n.add(genres, text='Жанры')
-    n.add(select_data, text='Выборка данных')
+    def change_main_base(self):
+        print(self.df_types)
+        self.df_curr = self.df_list[self.choice_data.get()]
+        self.df_types = [x for x in self.df_curr.dtypes]
+        self.attr = np.empty(shape=(self.df_curr.shape[1]), dtype="O")
+        self.init_manager()
 
-    n.pack()
-    root.mainloop()
-    print(df_tracks)
-    
- 
-if __name__ == '__main__':
-    main()
+    def change_attr(self):
+        df = self.df_curr.groupby(self.df_curr[self.choice_attr.get()]).size().reset_index(name="Количество")
+        df["Частотность"] = pd.Series(round(df["Количество"]/self.df_curr.shape[0], 3), index=df.index)
+        self.init_table(df)
+
+    def init_manager(self):
+        manager = ttk.Frame(self)
+        manager.grid(column=0, row=0, sticky="nsew")
+
+        label_choose = ttk.Label(manager, text="Выберите базу данных: ")
+        label_choose.grid(column=0, row=0, padx=10, pady=10, sticky="nw")
+
+        len_df_list = len(self.df_list)
+        column_iter = 0
+
+        for i in range(len_df_list):
+            radiobutton_choice = ttk.Radiobutton(manager, text=self.df_names[i], variable=self.choice_data, value=i, command=self.change_main_base)
+            radiobutton_choice.grid(column=column_iter, row=1, padx=5, pady=5, sticky="ne")
+            column_iter+=1
+
+        label_choose_attr = ttk.Label(manager, text="Выберите атрибуты базы данных: ")
+        label_choose_attr.grid(column=0, row=2, padx=10, pady=10, sticky="nw")
+
+        for i in range(len(self.df_curr.columns)):
+            if self.df_types[i] == "O":
+               self.attr[i] = self.df_curr.columns[i] 
+
+        column_iter = 0
+        for i in range(len(self.attr)):
+            if self.attr[i]:
+                radiobutton_choice = ttk.Radiobutton(manager, text=self.attr[i], variable=self.choice_attr, value=self.attr[i], command=self.change_attr)
+                radiobutton_choice.grid(column=column_iter, row=3, padx=5, pady=5, sticky="ne")
+                column_iter+=1
+
+class QuantityData(ttk.Frame):
+    def __init__(self, parent, df_list, df_names, file_path):
+        super().__init__(parent)
+        self.df_list = df_list
+        self.file_path = file_path
+
+        self.df_curr = self.df_list[0]
+
+        choice_data = tk.IntVar()
+        choice_data.set(0)
+
+        choice_attr = np.empty(shape=(self.df_curr.shape[1]), dtype="O")
+
+        self.init_table(self.df_list[1])
+
+        self.grid_rowconfigure(0, weight=1, uniform="group1")
+        self.columnconfigure(0, weight=1)
+        self.grid_rowconfigure(1, weight=2, uniform="group1")
+
+    def init_table(self, df):
+        table = Table(self, df)
+        table.grid(column=0, row=1, sticky="nsew")
+
+class StaticData(ttk.Frame):
+    def __init__(self, parent, df_list, df_names, file_path):
+        super().__init__(parent)
+        self.grid(column=0, row=0)
+
+        quality = QualityData(self, df_list, df_names, file_path)
+        quality.grid(column=0, row=0, sticky="nsew")
+        quantity = QuantityData(self, df_list, df_names, file_path)
+        quantity.grid(column=1, row=0, sticky="nsew")
+
+        self.grid_columnconfigure(0, weight=1, uniform="group1")
+        self.rowconfigure(0, weight=1)
+        self.grid_columnconfigure(1, weight=1, uniform="group1")
+
+def update_df():
+    select_data.df_list = [tracks.get_upd_df(), albums.get_upd_df(), artists.get_upd_df(), genres.get_upd_df()]
+    static_data.df_list = [tracks.get_upd_df(), albums.get_upd_df(), artists.get_upd_df(), genres.get_upd_df()]
+
+file_path = "output/"
+df_tracks = pd.read_excel("data/tracks.xlsx")
+df_albums = pd.read_excel("data/albums.xlsx")
+df_artists = pd.read_excel("data/artists.xlsx")
+df_genres = pd.read_excel("data/genres.xlsx")
+
+df_list = [df_tracks, df_albums, df_artists, df_genres]
+df_names = ["Треки", "Альбомы", "Артисты", "Жанры"]
+
+root = tk.Tk()
+root.geometry('1200x600+200+150')
+root.title("Менеджер")
+n = ttk.Notebook(root, width=root.winfo_screenwidth(), height=root.winfo_screenheight())
+
+tracks = TableManage(root, df_tracks, file_path)
+albums = TableManage(root, df_albums, file_path)
+artists = TableManage(root, df_artists, file_path)
+genres = TableManage(root, df_genres, file_path)
+
+select_data = SampleData(root, df_list, df_names, file_path)
+static_data = StaticData(root, df_list, df_names, file_path)
+
+n.add(tracks, text='Треки')
+n.add(albums, text='Альбомы')
+n.add(artists, text='Артисты')
+n.add(genres, text='Жанры')
+n.add(select_data, text='Выборка данных')
+n.add(static_data, text='Статистический отчет')
+
+n.pack()
+root.mainloop()
+print(df_tracks)

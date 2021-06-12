@@ -1,33 +1,25 @@
-from tkinter import *
-from tkinter import scrolledtext
+import sys
 
-master_window = Tk()
+def check(arr):
+    for x in range(1, arr[0]+1):
+        i = 0
+        while i < len(arr):
 
-# Parent widget for the buttons
-buttons_frame = Frame(master_window)
-buttons_frame.grid(row=0, column=0, sticky=W+E)    
+            if arr[i] == x:
+                interval = arr[(i+1):(i+arr[i]+1)]
 
-btn_Image = Button(buttons_frame, text='Image')
-btn_Image.grid(row=0, column=0, padx=(10), pady=10)
+                if len(interval) == x and sum(interval) == x-1:
+                    del arr[(i+1):(i+arr[i]+1)]
+                else:
+                    return 0
 
-btn_File = Button(buttons_frame, text='File')
-btn_File.grid(row=0, column=1, padx=(10), pady=10)
+            i += 1
+    return int(len(arr) == 1)
+            
+def main():
+    for line in sys.stdin:
+        d = [int(x) for x in line.split()]
+        print(check(d))
 
-btn_Folder = Button(buttons_frame, text='Folder')
-btn_Folder.grid(row=0, column=2, padx=(10), pady=10)
-
-# Group1 Frame ----------------------------------------------------
-group1 = LabelFrame(master_window, text="Text Box", padx=5, pady=5)
-group1.grid(row=1, column=0, columnspan=3, padx=10, pady=10, sticky=E+W+N+S)
-
-master_window.columnconfigure(0, weight=1)
-master_window.rowconfigure(1, weight=1)
-
-group1.rowconfigure(0, weight=1)
-group1.columnconfigure(0, weight=1)
-
-# Create the textbox
-txtbox = scrolledtext.ScrolledText(group1, width=40, height=10)
-txtbox.grid(row=0, column=0,   sticky=E+W+N+S)
-
-mainloop()
+if __name__ == "__main__":
+    main()
