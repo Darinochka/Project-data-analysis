@@ -388,89 +388,263 @@ class QualityData(ttk.Frame):
         self.df_list = df_list
         self.file_path = file_path
         self.df_names = df_names
-        self.df_curr = self.df_list[0]
-        self.df_types = [x for x in self.df_curr.dtypes]
-        self.choice_data = tk.IntVar()
-        self.choice_data.set(0)
 
-        self.choice_attr = tk.StringVar()
+        self.df_curr = self.df_list[0] #current dataframe
+        self.df_stat_curr = pd.DataFrame() #current statistic dataframe
+        self.df_types = [[col_type for col_type in df.dtypes] for df in df_list] #list of the types every dataframe
+        self.df_curr_types = self.df_types[0]   #current types of the current dataframe
+
+        self.choice_data = tk.IntVar()  #choice of dataframe
+        self.choice_data.set(-1)
+
+        self.choice_attr = tk.StringVar()   #choice of the attribute
         self.choice_attr.set("")
 
-        self.attr = np.empty(shape=(self.df_curr.shape[1]), dtype="O")
+        self.attr = []
+        self.define_quality_attr()
 
         self.init_manager()
 
         self.grid_rowconfigure(0, weight=1, uniform="group1")
         self.columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=2, uniform="group1")
+        self.grid_rowconfigure(1, weight=1, uniform="group1")
 
     def init_table(self, df):
         table = Table(self, df)
         table.grid(column=0, row=1, sticky="nsew")
 
     def change_main_base(self):
-        print(self.df_types)
         self.df_curr = self.df_list[self.choice_data.get()]
-        self.df_types = [x for x in self.df_curr.dtypes]
-        self.attr = np.empty(shape=(self.df_curr.shape[1]), dtype="O")
+        self.df_curr_types = self.df_types[self.choice_data.get()]
+        self.define_quality_attr()
         self.init_manager()
 
-    def change_attr(self):
+    def build_statistic(self):
         df = self.df_curr.groupby(self.df_curr[self.choice_attr.get()]).size().reset_index(name="Количество")
-        df["Частотность"] = pd.Series(round(df["Количество"]/self.df_curr.shape[0], 3), index=df.index)
+        df["Частотность"] = pd.Series((round(df["Количество"]/self.df_curr.shape[0], 3))*100, index=df.index)
+        self.df_stat_curr = df
         self.init_table(df)
+
+    def define_quality_attr(self):
+        self.attr = []
+        for i in range(len(self.df_curr.columns)):
+            if self.df_curr_types[i] == "O":
+               self.attr.append(self.df_curr.columns[i]) 
 
     def init_manager(self):
         manager = ttk.Frame(self)
         manager.grid(column=0, row=0, sticky="nsew")
 
+        label_attr = ttk.Label(manager, text="Качественные атрибуты")
+        label_attr.grid(column=0, row=0, padx=10, pady=10, sticky="nw")
+
         label_choose = ttk.Label(manager, text="Выберите базу данных: ")
-        label_choose.grid(column=0, row=0, padx=10, pady=10, sticky="nw")
+        label_choose.grid(column=0, row=1, padx=10, pady=10, sticky="nw")
 
         len_df_list = len(self.df_list)
         column_iter = 0
 
         for i in range(len_df_list):
-            radiobutton_choice = ttk.Radiobutton(manager, text=self.df_names[i], variable=self.choice_data, value=i, command=self.change_main_base)
-            radiobutton_choice.grid(column=column_iter, row=1, padx=5, pady=5, sticky="ne")
+            radiobutton_choice = ttk.Radiobutton(manager, 
+                                                text=self.df_names[i], 
+                                                variable=self.choice_data, 
+                                                value=i, 
+                                                command=self.change_main_base)
+            radiobutton_choice.grid(column=column_iter, row=2, padx=5, pady=5, sticky="ne")
             column_iter+=1
 
         label_choose_attr = ttk.Label(manager, text="Выберите атрибуты базы данных: ")
-        label_choose_attr.grid(column=0, row=2, padx=10, pady=10, sticky="nw")
+        label_choose_attr.grid(column=0, row=3, padx=10, pady=10, sticky="nw")
 
-        for i in range(len(self.df_curr.columns)):
-            if self.df_types[i] == "O":
-               self.attr[i] = self.df_curr.columns[i] 
+        self.define_quality_attr()
 
         column_iter = 0
         for i in range(len(self.attr)):
             if self.attr[i]:
-                radiobutton_choice = ttk.Radiobutton(manager, text=self.attr[i], variable=self.choice_attr, value=self.attr[i], command=self.change_attr)
-                radiobutton_choice.grid(column=column_iter, row=3, padx=5, pady=5, sticky="ne")
+                radiobutton_choice = ttk.Radiobutton(manager, 
+                                                    text=self.attr[i], 
+                                                    variable=self.choice_attr, 
+                                                    value=self.attr[i], 
+                                                    command=self.build_statistic)
+                radiobutton_choice.grid(column=column_iter, row=4, padx=5, pady=5, sticky="ne")
                 column_iter+=1
+
+        label_save_as = ttk.Label(manager, text="Сохранить как: ")
+        label_save_as.grid(column=0, row=5, padx=10, pady=10)
+
+        button_save_csv = ttk.Button(manager, text=".csv", command=self.save_as_csv)
+        button_save_csv.grid(column=1, row=5, padx=10, pady=10, sticky="e")
+
+        button_save_xlsx = ttk.Button(manager, text=".xlsx", command=self.save_as_xlsx)
+        button_save_xlsx.grid(column=2, row=5, padx=10, pady=10)
+
+        button_save_pic = ttk.Button(manager, text=".pic", command=self.save_as_pic)
+        button_save_pic.grid(column=3, row=5, padx=10, pady=10)
+
+    def save_default(self, format):
+        file_name_default = datetime.now().strftime("%Y%m%d-%H%M%S")
+        f_default = open(self.file_path+file_name_default+format, 'w', encoding='utf-8')
+        return f_default
+
+    def save_as_csv(self):
+        file_name = fd.asksaveasfilename(
+        filetypes=(("CSV files", "*.csv"),
+                   ("All files", "*.*")))
+        f = open(file_name, 'w')
+        self.df_stat_curr.to_csv(file_name, sep = ",", index = False)
+        f.close()
+
+        self.df_stat_curr.to_csv(self.save_default(".csv"), index = False)
+
+    def save_as_xlsx(self):
+        file_name = fd.asksaveasfilename(
+        filetypes=(("Excel files", "*.xls"),
+                   ("All files", "*.*")))
+        f = open(file_name, 'w')
+        writer = pd.ExcelWriter(file_name, engine='xlsxwriter')
+        self.df_stat_curr.to_excel(writer, index = False, encoding='utf-8')
+        writer.save()
+        f.close()
+
+        file_name_default = datetime.now().strftime("%Y%m%d-%H%M%S")
+        self.df_stat_curr.to_excel(self.file_path+file_name_default+".xlsx", index = False)
+    
+    def save_as_pic(self):
+        file_name = fd.asksaveasfilename(
+        filetypes=(("Picle files", "*.pic"),
+                   ("All files", "*.*")))
+        f = open(file_name, 'w')
+        self.df_stat_curr.to_pickle(file_name)
+        f.close()
+
+        self.df_stat_curr.to_pickle(self.save_default(".pic"), index=False)
 
 class QuantityData(ttk.Frame):
     def __init__(self, parent, df_list, df_names, file_path):
         super().__init__(parent)
         self.df_list = df_list
         self.file_path = file_path
+        self.df_names = df_names
 
-        self.df_curr = self.df_list[0]
+        self.df_curr = self.df_list[0] #current dataframe
+        self.df_stat_curr = pd.DataFrame()
+        self.df_types = [[col_type for col_type in df.dtypes] for df in df_list] #list of the types every dataframe
+        self.df_curr_types = self.df_types[0]   #current types of the current dataframe
 
-        choice_data = tk.IntVar()
-        choice_data.set(0)
+        self.choice_data = tk.IntVar()  #choice of dataframe
+        self.choice_data.set(-1)
 
-        choice_attr = np.empty(shape=(self.df_curr.shape[1]), dtype="O")
+        self.choice_attr = tk.StringVar()   #choice of the attribute
+        self.choice_attr.set("")
 
-        self.init_table(self.df_list[1])
+        self.define_quantity_attr()
+
+        self.init_manager()
 
         self.grid_rowconfigure(0, weight=1, uniform="group1")
         self.columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=2, uniform="group1")
+        self.grid_rowconfigure(1, weight=1, uniform="group1")
 
     def init_table(self, df):
         table = Table(self, df)
         table.grid(column=0, row=1, sticky="nsew")
+
+    def change_main_base(self):
+        self.df_curr = self.df_list[self.choice_data.get()]
+        self.df_curr_types = self.df_types[self.choice_data.get()]
+        self.transform_type()
+        self.build_statistic()
+
+    def transform_type(self):
+        for i, column in enumerate(self.df_curr.columns):
+            self.df_curr = self.df_curr.astype({column:self.df_curr_types[i]})
+
+    def build_statistic(self):
+        self.define_quantity_attr()
+        df = pd.DataFrame(index=self.df_curr.columns)
+        df["Переменные"] = self.df_curr.columns
+        df["Среднее"] = self.df_curr.mean().round(3)
+        df["Максимальное"] = self.df_curr.max().round(3)
+        df["Минимальное"] = self.df_curr.min().round(3)
+        df["Выборочная дисперсия"] = self.df_curr.var(ddof=1).round(3)
+        df["Стадартное отклонение"] = self.df_curr.std().round(3)
+        self.df_stat_curr = df
+        self.init_table(df)
+
+    def define_quantity_attr(self):
+        attr = []
+        for i in range(len(self.df_curr.columns)):
+            if self.df_curr_types[i] == "int64" or self.df_curr_types[i] == "float64":
+               attr.append(self.df_curr.columns[i]) 
+        self.df_curr = self.df_curr[attr]
+        
+    def init_manager(self):
+        manager = ttk.Frame(self)
+        manager.grid(column=0, row=0, sticky="nsew")
+
+        label_attr = ttk.Label(manager, text="Количественные атрибуты")
+        label_attr.grid(column=0, row=0, padx=10, pady=10, sticky="nw")
+
+        label_choose = ttk.Label(manager, text="Выберите базу данных: ")
+        label_choose.grid(column=0, row=1, padx=10, pady=10, sticky="nw")
+
+        len_df_list = len(self.df_list)
+        column_iter = 0
+
+        for i in range(len_df_list):
+            radiobutton_choice = ttk.Radiobutton(manager, text=self.df_names[i], variable=self.choice_data, value=i, command=self.change_main_base)
+            radiobutton_choice.grid(column=column_iter, row=2, padx=5, pady=5, sticky="ne")
+            column_iter+=1
+
+        label_save_as = ttk.Label(manager, text="Сохранить как: ")
+        label_save_as.grid(column=0, row=5, padx=10, pady=10)
+
+        button_save_csv = ttk.Button(manager, text=".csv", command=self.save_as_csv)
+        button_save_csv.grid(column=1, row=5, padx=10, pady=10, sticky="e")
+
+        button_save_xlsx = ttk.Button(manager, text=".xlsx", command=self.save_as_xlsx)
+        button_save_xlsx.grid(column=2, row=5, padx=10, pady=10)
+
+        button_save_pic = ttk.Button(manager, text=".pic", command=self.save_as_pic)
+        button_save_pic.grid(column=3, row=5, padx=10, pady=10)
+
+    def save_default(self, format):
+        file_name_default = datetime.now().strftime("%Y%m%d-%H%M%S")
+        f_default = open(self.file_path+file_name_default+format, 'w', encoding='utf-8')
+        return f_default
+
+    def save_as_csv(self):
+        file_name = fd.asksaveasfilename(
+        filetypes=(("CSV files", "*.csv"),
+                   ("All files", "*.*")))
+        f = open(file_name, 'w')
+        self.df_stat_curr.to_csv(file_name, sep = ",", index = False)
+        f.close()
+
+        self.df_stat_curr.to_csv(self.save_default(".csv"), index = False)
+
+    def save_as_xlsx(self):
+        file_name = fd.asksaveasfilename(
+        filetypes=(("Excel files", "*.xls"),
+                   ("All files", "*.*")))
+        f = open(file_name, 'w')
+        writer = pd.ExcelWriter(file_name, engine='xlsxwriter')
+        self.df_stat_curr.to_excel(writer, index = False, encoding='utf-8')
+        writer.save()
+        f.close()
+
+        file_name_default = datetime.now().strftime("%Y%m%d-%H%M%S")
+        self.df_stat_curr.to_excel(self.file_path+file_name_default+".xlsx", index = False)
+    
+    def save_as_pic(self):
+        file_name = fd.asksaveasfilename(
+        filetypes=(("Picle files", "*.pic"),
+                   ("All files", "*.*")))
+        f = open(file_name, 'w')
+        self.df_stat_curr.to_pickle(file_name)
+        f.close()
+
+        self.df_stat_curr.to_pickle(self.save_default(".pic"), index=False)
 
 class StaticData(ttk.Frame):
     def __init__(self, parent, df_list, df_names, file_path):
@@ -486,15 +660,124 @@ class StaticData(ttk.Frame):
         self.rowconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1, uniform="group1")
 
+class PivotTable(ttk.Frame):
+    def __init__(self, parent, df_list, df_names, file_path):
+        super().__init__(parent)
+        self.grid(column=0, row=0)
+        
+        self.df_names = df_names
+        self.df_list = df_list
+        self.df_curr = df_list[0]
+        self.df_types = [[col_type for col_type in df.dtypes] for df in df_list] #list of the types every dataframe
+        self.df_curr_types = self.df_types[0]
+        self.file_path = file_path
+
+        self.choice_data = tk.IntVar()  #choice of dataframe
+        self.choice_data.set(-1)
+
+        self.aggfunc = tk.StringVar()  #choice of datafram
+
+        self.first_attr = tk.StringVar()
+        self.second_attr = tk.StringVar()
+
+        self.attr = []
+        self.define_quality_attr()
+
+        self.init_manager()
+
+        self.grid_columnconfigure(0, weight=1, uniform="group1")
+        self.rowconfigure(0, weight=1)
+        self.grid_columnconfigure(1, weight=1, uniform="group1")
+
+    def change_main_base(self):
+        self.df_curr = self.df_list[self.choice_data.get()]
+        self.df_curr_types = self.df_types[self.choice_data.get()]
+        self.define_quality_attr()
+        self.init_manager()
+
+    def define_quality_attr(self):
+        self.attr = []
+        for i in range(len(self.df_curr.columns)):
+            if self.df_curr_types[i] == "O":
+               self.attr.append(self.df_curr.columns[i]) 
+
+    def init_table(self, df):
+        table = Table(self, df)
+        table.grid(column=0, row=0, sticky="nsew")
+
+    def change_table(self):
+        try:
+            index = [self.first_attr.get(), self.second_attr.get()]
+
+            if self.aggfunc.get() == "Среднее":
+                df_update = pd.pivot_table(self.df_curr, index=index, aggfunc=np.mean)
+            elif self.aggfunc.get() == "Сумма":
+                df_update = pd.pivot_table(self.df_curr, index=index, aggfunc=np.sum)
+            elif self.aggfunc.get() == "Максимум":
+                df_update = pd.pivot_table(self.df_curr, index=index, aggfunc=np.max)
+            elif self.aggfunc.get() == "Минимум":
+                df_update = pd.pivot_table(self.df_curr, index=index, aggfunc=np.min)
+            elif self.aggfunc.get() == "Стандартное отклонение":
+                df_update = pd.pivot_table(self.df_curr, index=index, aggfunc=np.std)
+
+            df_update = df_update.reset_index()
+            self.init_table(df_update)
+        except ValueError:
+            mb.showerror(
+                "Ошибка", 
+                "Ты ввел неверные атрибуты!")
+
+    def init_manager(self):
+        manager = ttk.Frame(self)
+        manager.grid(column=1, row=0, sticky="nsew")
+
+        choice_dataframe = ttk.Label(manager, text="Выберите базу данных: ")
+        choice_dataframe.grid(column=0, row=0, padx=10, pady=10, sticky="nw")
+        
+        len_df_list = len(self.df_list)
+        row_iter = 0
+
+        for i in range(len_df_list):
+            radiobutton_choice = ttk.Radiobutton(manager, 
+                                                text=self.df_names[i], 
+                                                variable=self.choice_data, 
+                                                value=i, 
+                                                command=self.change_main_base)
+            radiobutton_choice.grid(column=1, row=row_iter, padx=10, pady=10, sticky="nw")
+            row_iter+=1
+
+        choice_quality_attr = ttk.Label(manager, text="Выберите пару качественных атрибутов: ")
+        choice_quality_attr.grid(column=0, row=row_iter+1, padx=10, pady=10, sticky="nw")
+
+        first_attr_choice = ttk.Combobox(manager, textvariable=self.first_attr, state="readonly", values=self.attr)
+        first_attr_choice.grid(column=1, row=row_iter+1, padx=10, pady=10)
+
+        second_attr_choice = ttk.Combobox(manager, textvariable=self.second_attr, state="readonly", values=self.attr)
+        second_attr_choice.grid(column=2, row=row_iter+1, padx=10, pady=10)
+
+        label_сhoice_afffunc = ttk.Label(manager, text="Выберите метод агрегации: ")
+        label_сhoice_afffunc.grid(column=0, row=row_iter+2, padx=10, pady=10, sticky="nw")
+
+        agg_funcs = ["Среднее", "Сумма", "Максимум", "Минимум", "Стандартное отклонение"]
+
+        choice_agg_func = ttk.Combobox(manager, textvariable=self.aggfunc, state="readonly", values=agg_funcs)
+        choice_agg_func.grid(column=1, row=row_iter+2, padx=10, pady=10)
+
+        apply_button = ttk.Button(manager, text="Применить", command=self.change_table)
+        apply_button.grid(column=2, row=row_iter+3, padx=10, pady=10, sticky="ne")
+
 def update_df():
-    select_data.df_list = [tracks.get_upd_df(), albums.get_upd_df(), artists.get_upd_df(), genres.get_upd_df()]
-    static_data.df_list = [tracks.get_upd_df(), albums.get_upd_df(), artists.get_upd_df(), genres.get_upd_df()]
+    df_list = [tracks.get_upd_df(), albums.get_upd_df(), artists.get_upd_df(), genres.get_upd_df()]
+    select_data.df_list = df_list
+    static_data.df_list = df_list
+    pivot_table.df_list = df_list
 
 file_path = "output/"
 df_tracks = pd.read_excel("data/tracks.xlsx")
 df_albums = pd.read_excel("data/albums.xlsx")
 df_artists = pd.read_excel("data/artists.xlsx")
 df_genres = pd.read_excel("data/genres.xlsx")
+df = pd.read_excel("data/tracks1.xlsx")
 
 df_list = [df_tracks, df_albums, df_artists, df_genres]
 df_names = ["Треки", "Альбомы", "Артисты", "Жанры"]
@@ -511,6 +794,7 @@ genres = TableManage(root, df_genres, file_path)
 
 select_data = SampleData(root, df_list, df_names, file_path)
 static_data = StaticData(root, df_list, df_names, file_path)
+pivot_table = PivotTable(root, df_list, df_names, file_path)
 
 n.add(tracks, text='Треки')
 n.add(albums, text='Альбомы')
@@ -518,7 +802,7 @@ n.add(artists, text='Артисты')
 n.add(genres, text='Жанры')
 n.add(select_data, text='Выборка данных')
 n.add(static_data, text='Статистический отчет')
+n.add(pivot_table, text="Сводная таблица")
 
 n.pack()
 root.mainloop()
-print(df_tracks)
