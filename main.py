@@ -693,7 +693,13 @@ class PivotTable(ttk.Frame):
         self.df_curr = self.df_list[self.choice_data.get()]
         self.df_curr_types = self.df_types[self.choice_data.get()]
         self.define_quality_attr()
+        self.clear_combobox()
         self.init_manager()
+    
+    def clear_combobox(self):
+        self.first_attr.set("")
+        self.second_attr.set("")
+        self.aggfunc.set("")
 
     def define_quality_attr(self):
         self.attr = []
@@ -710,15 +716,15 @@ class PivotTable(ttk.Frame):
             index = [self.first_attr.get(), self.second_attr.get()]
 
             if self.aggfunc.get() == "Среднее":
-                df_update = pd.pivot_table(self.df_curr, index=index, aggfunc=np.mean)
+                df_update = pd.pivot_table(self.df_curr, index=index, aggfunc=np.mean, margins=True)
             elif self.aggfunc.get() == "Сумма":
-                df_update = pd.pivot_table(self.df_curr, index=index, aggfunc=np.sum)
+                df_update = pd.pivot_table(self.df_curr, index=index, aggfunc=np.sum, margins=True)
             elif self.aggfunc.get() == "Максимум":
-                df_update = pd.pivot_table(self.df_curr, index=index, aggfunc=np.max)
+                df_update = pd.pivot_table(self.df_curr, index=index, aggfunc=np.max, margins=True)
             elif self.aggfunc.get() == "Минимум":
-                df_update = pd.pivot_table(self.df_curr, index=index, aggfunc=np.min)
+                df_update = pd.pivot_table(self.df_curr, index=index, aggfunc=np.min, margins=True)
             elif self.aggfunc.get() == "Стандартное отклонение":
-                df_update = pd.pivot_table(self.df_curr, index=index, aggfunc=np.std)
+                df_update = pd.pivot_table(self.df_curr, index=index, aggfunc=np.std, margins=True)
 
             df_update = df_update.reset_index()
             self.init_table(df_update)
@@ -766,6 +772,44 @@ class PivotTable(ttk.Frame):
         apply_button = ttk.Button(manager, text="Применить", command=self.change_table)
         apply_button.grid(column=2, row=row_iter+3, padx=10, pady=10, sticky="ne")
 
+        #НАСТРОИТЬ СОХРАНЕНИЕ
+    def save_default(self, format):
+        file_name_default = datetime.now().strftime("%Y%m%d-%H%M%S")
+        f_default = open(self.file_path+file_name_default+format, 'w', encoding='utf-8')
+        return f_default
+
+    def save_as_csv(self):
+        file_name = fd.asksaveasfilename(
+        filetypes=(("CSV files", "*.csv"),
+                   ("All files", "*.*")))
+        f = open(file_name, 'w')
+        self.df_change_curr.to_csv(file_name, sep = ",", index = False)
+        f.close()
+
+        self.df_change_curr.to_csv(self.save_default(".csv"), index = False)
+
+    def save_as_xlsx(self):
+        file_name = fd.asksaveasfilename(
+        filetypes=(("Excel files", "*.xls"),
+                   ("All files", "*.*")))
+        f = open(file_name, 'w')
+        writer = pd.ExcelWriter(file_name, engine='xlsxwriter')
+        self.df_change_curr.to_excel(writer, index = False, encoding='utf-8')
+        writer.save()
+        f.close()
+
+        file_name_default = datetime.now().strftime("%Y%m%d-%H%M%S")
+        self.df_change_curr.to_excel(self.file_path+file_name_default+".xlsx", index = False)
+    
+    def save_as_pic(self):
+        file_name = fd.asksaveasfilename(
+        filetypes=(("Picle files", "*.pic"),
+                   ("All files", "*.*")))
+        f = open(file_name, 'w')
+        self.df_change_curr.to_pickle(file_name)
+        f.close()
+
+        self.df_change_curr.to_pickle(self.save_default(".pic"), index=False)
 def update_df():
     df_list = [tracks.get_upd_df(), albums.get_upd_df(), artists.get_upd_df(), genres.get_upd_df()]
     select_data.df_list = df_list
