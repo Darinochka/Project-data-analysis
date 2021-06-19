@@ -1,12 +1,15 @@
 import pandas as pd 
 import numpy as np
-import matplotlib as mlt
 from library import rep
 import tkinter as tk
 import tkinter.ttk as ttk
 from tkinter import messagebox as mb
 from tkinter import filedialog as fd
-import random as rd
+import tkinter as tk
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import matplotlib.pyplot as plt
+import matplotlib as mt
+import math
 from datetime import datetime
 
 
@@ -672,6 +675,7 @@ class PivotTable(ttk.Frame):
         self.df_curr_types = self.df_types[0]
         self.file_path = file_path
 
+        self.df_update = pd.DataFrame()
         self.choice_data = tk.IntVar()  #choice of dataframe
         self.choice_data.set(-1)
 
@@ -723,15 +727,13 @@ class PivotTable(ttk.Frame):
                 df_update = pd.pivot_table(self.df_curr, index=index, aggfunc=np.max, margins=True)
             elif self.aggfunc.get() == "Минимум":
                 df_update = pd.pivot_table(self.df_curr, index=index, aggfunc=np.min, margins=True)
-            elif self.aggfunc.get() == "Стандартное отклонение":
-                df_update = pd.pivot_table(self.df_curr, index=index, aggfunc=np.std, margins=True)
 
-            df_update = df_update.reset_index()
-            self.init_table(df_update)
-        except ValueError:
+            self.df_update = df_update.reset_index()
+            self.init_table(self.df_update)
+        except:
             mb.showerror(
                 "Ошибка", 
-                "Ты ввел неверные атрибуты!")
+                "Ты ввел неверные данные!")
 
     def init_manager(self):
         manager = ttk.Frame(self)
@@ -752,7 +754,7 @@ class PivotTable(ttk.Frame):
             radiobutton_choice.grid(column=1, row=row_iter, padx=10, pady=10, sticky="nw")
             row_iter+=1
 
-        choice_quality_attr = ttk.Label(manager, text="Выберите пару качественных атрибутов: ")
+        choice_quality_attr = ttk.Label(manager, text="Выберите пару качественных\n атрибутов: ")
         choice_quality_attr.grid(column=0, row=row_iter+1, padx=10, pady=10, sticky="nw")
 
         first_attr_choice = ttk.Combobox(manager, textvariable=self.first_attr, state="readonly", values=self.attr)
@@ -764,15 +766,26 @@ class PivotTable(ttk.Frame):
         label_сhoice_afffunc = ttk.Label(manager, text="Выберите метод агрегации: ")
         label_сhoice_afffunc.grid(column=0, row=row_iter+2, padx=10, pady=10, sticky="nw")
 
-        agg_funcs = ["Среднее", "Сумма", "Максимум", "Минимум", "Стандартное отклонение"]
+        agg_funcs = ["Среднее", "Сумма", "Максимум", "Минимум"]
 
         choice_agg_func = ttk.Combobox(manager, textvariable=self.aggfunc, state="readonly", values=agg_funcs)
         choice_agg_func.grid(column=1, row=row_iter+2, padx=10, pady=10)
 
         apply_button = ttk.Button(manager, text="Применить", command=self.change_table)
-        apply_button.grid(column=2, row=row_iter+3, padx=10, pady=10, sticky="ne")
+        apply_button.grid(column=2, row=row_iter+2, padx=10, pady=10, sticky="ne")
 
-        #НАСТРОИТЬ СОХРАНЕНИЕ
+        label_save_as = ttk.Label(manager, text="Сохранить как: ")
+        label_save_as.grid(column=0, row=row_iter+4, padx=10, pady=10, sticky="nw")
+
+        button_save_csv = ttk.Button(manager, text=".csv", command=self.save_as_csv)
+        button_save_csv.grid(column=1, row=row_iter+4, padx=10, pady=10, sticky="e")
+
+        button_save_xlsx = ttk.Button(manager, text=".xlsx", command=self.save_as_xlsx)
+        button_save_xlsx.grid(column=1, row=row_iter+5, padx=10, pady=10, sticky="e")
+
+        button_save_pic = ttk.Button(manager, text=".pic", command=self.save_as_pic)
+        button_save_pic.grid(column=1, row=row_iter+6, padx=10, pady=10, sticky="e")
+
     def save_default(self, format):
         file_name_default = datetime.now().strftime("%Y%m%d-%H%M%S")
         f_default = open(self.file_path+file_name_default+format, 'w', encoding='utf-8')
@@ -783,10 +796,10 @@ class PivotTable(ttk.Frame):
         filetypes=(("CSV files", "*.csv"),
                    ("All files", "*.*")))
         f = open(file_name, 'w')
-        self.df_change_curr.to_csv(file_name, sep = ",", index = False)
+        self.df_update.to_csv(file_name, sep = ",", index = False)
         f.close()
 
-        self.df_change_curr.to_csv(self.save_default(".csv"), index = False)
+        self.df_update.to_csv(self.save_default(".csv"), index = False)
 
     def save_as_xlsx(self):
         file_name = fd.asksaveasfilename(
@@ -794,22 +807,84 @@ class PivotTable(ttk.Frame):
                    ("All files", "*.*")))
         f = open(file_name, 'w')
         writer = pd.ExcelWriter(file_name, engine='xlsxwriter')
-        self.df_change_curr.to_excel(writer, index = False, encoding='utf-8')
+        self.df_update.to_excel(writer, index = False, encoding='utf-8')
         writer.save()
         f.close()
 
         file_name_default = datetime.now().strftime("%Y%m%d-%H%M%S")
-        self.df_change_curr.to_excel(self.file_path+file_name_default+".xlsx", index = False)
+        self.df_update.to_excel(self.file_path+file_name_default+".xlsx", index = False)
     
     def save_as_pic(self):
         file_name = fd.asksaveasfilename(
         filetypes=(("Picle files", "*.pic"),
                    ("All files", "*.*")))
         f = open(file_name, 'w')
-        self.df_change_curr.to_pickle(file_name)
+        self.df_update.to_pickle(file_name)
         f.close()
 
-        self.df_change_curr.to_pickle(self.save_default(".pic"), index=False)
+        self.df_update.to_pickle(self.save_default(".pic"), index=False)
+
+class BarPlot(ttk.Frame):
+    def __init__(self, parent, df):
+        super().__init__(parent)
+
+        self.df = df
+        self.df_types = [col_type for col_type in df.dtypes] 
+
+        self.qual_attr = tk.StringVar()
+        self.quan_attr = tk.StringVar()
+
+        self.define_quality_attr()
+        self.define_quantity_attr()
+        self.init_manager()
+        mt.use('TkAgg')
+
+    def define_quality_attr(self):
+        self.quality_attributes = []
+        for i in range(len(self.df.columns)):
+            if self.df_types[i] == "O":
+               self.quality_attributes.append(self.df.columns[i])
+
+    def define_quantity_attr(self):
+        self.quantity_attributes = []
+        for i in range(len(self.df.columns)):
+            if self.df_types[i] == "int64" or self.df_types[i] == "float64":
+               self.quantity_attributes.append(self.df.columns[i]) 
+
+    def init_graph(self):
+        fig = plt.figure(1)
+
+        canvas = FigureCanvasTkAgg(fig, master=self)
+        plot_widget = canvas.get_tk_widget()
+        plot_widget.grid(column=0, row=1)
+
+        quality_attr = self.df[self.qual_attr.get()]
+        quantity_attr = self.df[self.quan_attr.get()]
+
+        plt.bar(quality_attr, quantity_attr)
+
+        fig.canvas.draw()
+
+    def init_manager(self):
+        manager = ttk.Frame(self)
+        manager.grid(column=0, row=0)
+
+        label_choice = ttk.Label(manager, text="Выберите качественный атрибут: ")
+        label_choice.grid(column=0, row=0, padx=10, pady=10)
+
+        first_choice_rad = ttk.Combobox(manager, textvariable=self.qual_attr, state="readonly", values=self.quality_attributes)
+        first_choice_rad.grid(column=1, row=0, padx=10, pady=10)
+
+        label_choice = ttk.Label(manager, text="Выберите количественный атрибут: ")
+        label_choice.grid(column=2, row=0, padx=10, pady=10)
+
+        second_choice_rad = ttk.Combobox(manager, textvariable=self.quan_attr, state="readonly", values=self.quantity_attributes)
+        second_choice_rad.grid(column=3, row=0, padx=10, pady=10)
+
+        button_apply = ttk.Button(manager, text="Применить", command=self.init_graph)
+        button_apply.grid(column=4, row=0, padx=10, pady=10)
+
+
 def update_df():
     df_list = [tracks.get_upd_df(), albums.get_upd_df(), artists.get_upd_df(), genres.get_upd_df()]
     select_data.df_list = df_list
@@ -839,6 +914,7 @@ genres = TableManage(root, df_genres, file_path)
 select_data = SampleData(root, df_list, df_names, file_path)
 static_data = StaticData(root, df_list, df_names, file_path)
 pivot_table = PivotTable(root, df_list, df_names, file_path)
+graph_bar = BarPlot(root, df)
 
 n.add(tracks, text='Треки')
 n.add(albums, text='Альбомы')
@@ -847,6 +923,7 @@ n.add(genres, text='Жанры')
 n.add(select_data, text='Выборка данных')
 n.add(static_data, text='Статистический отчет')
 n.add(pivot_table, text="Сводная таблица")
+n.add(graph_bar, text="Столбчатая диаграмма")
 
 n.pack()
 root.mainloop()
