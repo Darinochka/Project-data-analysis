@@ -1,3 +1,4 @@
+from numpy.core.fromnumeric import size
 import pandas as pd 
 import numpy as np
 from library import rep
@@ -825,9 +826,11 @@ class PivotTable(ttk.Frame):
         self.df_update.to_pickle(self.save_default(".pic"), index=False)
 
 class BarPlot(ttk.Frame):
-    def __init__(self, parent, df):
+    def __init__(self, parent, df, file_path):
         super().__init__(parent)
 
+        self.file_path = file_path
+        
         self.df = df
         self.df_types = [col_type for col_type in df.dtypes] 
 
@@ -852,19 +855,25 @@ class BarPlot(ttk.Frame):
                self.quantity_attributes.append(self.df.columns[i]) 
 
     def init_graph(self):
-        fig = plt.figure(1)
+        try:
+            plt.style.use('ggplot')
+            plt.rcParams['font.size'] = '7'
 
-        canvas = FigureCanvasTkAgg(fig, master=self)
-        plot_widget = canvas.get_tk_widget()
-        plot_widget.grid(column=0, row=1)
+            fig = plt.figure(figsize=(10, 4.4), dpi=100)
 
-        quality_attr = self.df[self.qual_attr.get()]
-        quantity_attr = self.df[self.quan_attr.get()]
+            canvas = FigureCanvasTkAgg(fig, master=self)
+            plot_widget = canvas.get_tk_widget()
+            plot_widget.grid(column=0, row=1, padx=20, sticky="e")
 
-        plt.bar(quality_attr, quantity_attr)
-
-        fig.canvas.draw()
-
+            df = pd.pivot_table(self.df, index=[self.qual_attr.get()], values=[self.quan_attr.get()])
+            ax = fig.add_subplot()  
+            df.plot(kind='barh', legend=True, ax=ax)
+            plt.tight_layout()
+        except:
+            mb.showerror(
+                "Ошибка", 
+                "Ты ввел неверные данные!")
+        
     def init_manager(self):
         manager = ttk.Frame(self)
         manager.grid(column=0, row=0)
@@ -884,12 +893,118 @@ class BarPlot(ttk.Frame):
         button_apply = ttk.Button(manager, text="Применить", command=self.init_graph)
         button_apply.grid(column=4, row=0, padx=10, pady=10)
 
+        button_save_csv = ttk.Button(manager, text="Сохранить", command=self.save)
+        button_save_csv.grid(column=5, row=0, padx=10, pady=10, sticky="e")
 
+    def save_default(self):
+        file_name_default = datetime.now().strftime("%Y%m%d-%H%M%S")
+        f_default = self.file_path+file_name_default+".png"
+        plt.savefig(f_default)
+
+    def save(self):
+        file_name = fd.asksaveasfilename(
+            filetypes=(("PNG files", "*.png"),
+                    ("All files", "*.*")))
+        f = open(file_name, 'w')
+        plt.savefig(file_name)
+
+        self.save_default()
+
+class HistPlot(ttk.Frame):
+    def __init__(self, parent, df, file_path):
+        super().__init__(parent)
+
+        self.file_path = file_path
+        
+        self.df = df
+        self.df_types = [col_type for col_type in df.dtypes] 
+
+        self.qual_attr = tk.StringVar()
+        self.quan_attr = tk.StringVar()
+
+        self.define_quality_attr()
+        self.define_quantity_attr()
+        self.init_manager()
+        mt.use('TkAgg')
+
+    def define_quality_attr(self):
+        self.quality_attributes = []
+        for i in range(len(self.df.columns)):
+            if self.df_types[i] == "O":
+               self.quality_attributes.append(self.df.columns[i])
+
+    def define_quantity_attr(self):
+        self.quantity_attributes = []
+        for i in range(len(self.df.columns)):
+            if self.df_types[i] == "int64" or self.df_types[i] == "float64":
+               self.quantity_attributes.append(self.df.columns[i]) 
+
+    def init_graph(self):
+        try:
+            plt.style.use('ggplot')
+            plt.rcParams['font.size'] = '7'
+
+            fig = plt.figure(figsize=(10, 4.4), dpi=100)
+
+            canvas = FigureCanvasTkAgg(fig, master=self)
+            plot_widget = canvas.get_tk_widget()
+            plot_widget.grid(column=0, row=1, padx=20, sticky="e")
+
+            names = list(self.df[self.qual_attr.get()].unique())
+            values = []
+            for x in names:
+                values_x = list(self.df[self.df[self.qual_attr.get()] == x][self.quan_attr.get()])
+                values.append(values_x)
+            plt.hist(values, bins=int(180/15), label=names, density=True)
+            plt.legend()
+            plt.tight_layout()
+        except:
+            mb.showerror(
+                "Ошибка", 
+                "Ты ввел неверные данные!")
+        
+    def init_manager(self):
+        manager = ttk.Frame(self)
+        manager.grid(column=0, row=0)
+
+        label_choice = ttk.Label(manager, text="Выберите качественный атрибут: ")
+        label_choice.grid(column=0, row=0, padx=10, pady=10)
+
+        first_choice_rad = ttk.Combobox(manager, textvariable=self.qual_attr, state="readonly", values=self.quality_attributes)
+        first_choice_rad.grid(column=1, row=0, padx=10, pady=10)
+
+        label_choice = ttk.Label(manager, text="Выберите количественный атрибут: ")
+        label_choice.grid(column=2, row=0, padx=10, pady=10)
+
+        second_choice_rad = ttk.Combobox(manager, textvariable=self.quan_attr, state="readonly", values=self.quantity_attributes)
+        second_choice_rad.grid(column=3, row=0, padx=10, pady=10)
+
+        button_apply = ttk.Button(manager, text="Применить", command=self.init_graph)
+        button_apply.grid(column=4, row=0, padx=10, pady=10)
+
+        button_save_csv = ttk.Button(manager, text="Сохранить", command=self.save)
+        button_save_csv.grid(column=5, row=0, padx=10, pady=10, sticky="e")
+
+    def save_default(self):
+        file_name_default = datetime.now().strftime("%Y%m%d-%H%M%S")
+        f_default = self.file_path+file_name_default+".png"
+        plt.savefig(f_default)
+
+    def save(self):
+        file_name = fd.asksaveasfilename(
+            filetypes=(("PNG files", "*.png"),
+                    ("All files", "*.*")))
+        f = open(file_name, 'w')
+        plt.savefig(file_name)
+
+        self.save_default()
+        
 def update_df():
     df_list = [tracks.get_upd_df(), albums.get_upd_df(), artists.get_upd_df(), genres.get_upd_df()]
     select_data.df_list = df_list
     static_data.df_list = df_list
     pivot_table.df_list = df_list
+
 
 file_path = "output/"
 df_tracks = pd.read_excel("data/tracks.xlsx")
@@ -914,7 +1029,8 @@ genres = TableManage(root, df_genres, file_path)
 select_data = SampleData(root, df_list, df_names, file_path)
 static_data = StaticData(root, df_list, df_names, file_path)
 pivot_table = PivotTable(root, df_list, df_names, file_path)
-graph_bar = BarPlot(root, df)
+graph_bar = BarPlot(root, df, "graphics/")
+graph_hist = HistPlot(root, df, "graphics/")
 
 n.add(tracks, text='Треки')
 n.add(albums, text='Альбомы')
@@ -924,6 +1040,7 @@ n.add(select_data, text='Выборка данных')
 n.add(static_data, text='Статистический отчет')
 n.add(pivot_table, text="Сводная таблица")
 n.add(graph_bar, text="Столбчатая диаграмма")
+n.add(graph_hist, text="Гистограмма")
 
 n.pack()
 root.mainloop()
