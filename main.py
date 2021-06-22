@@ -1,7 +1,6 @@
 from numpy.core.fromnumeric import size
 import pandas as pd 
 import numpy as np
-from library import rep
 import tkinter as tk
 import tkinter.ttk as ttk
 from tkinter import messagebox as mb
@@ -12,6 +11,8 @@ import matplotlib.pyplot as plt
 import matplotlib as mt
 import math
 from datetime import datetime
+
+
 
 
 class Table(ttk.Frame):
@@ -61,6 +62,13 @@ class Table(ttk.Frame):
 
                 cnt = self.df.iloc[i, j]
                 self.values_df[i, j].set(str(cnt))
+
+    def get_df(self):
+        for i in range(self.hight):
+            for j in range(len(self.df.columns)):
+                self.df.iloc[i, j] = self.values_df[i, j].get()
+        print(self.df)
+        return self.df
 
 class SampleData(ttk.Frame):
 
@@ -177,7 +185,7 @@ class SampleData(ttk.Frame):
 
         self.df_change_curr.to_pickle(self.save_default(".pic"), index=False)
 
-class TableManage(ttk.Frame):
+class sTableManage(ttk.Frame):
  
     def __init__(self, parent, df, file_path):
         super().__init__(parent)
@@ -998,44 +1006,201 @@ class HistPlot(ttk.Frame):
         plt.savefig(file_name)
 
         self.save_default()
+
+class DataBase():
+    def __init__(self, path):
+        self.df = pd.read_excel(path)
+        self.define_df()
+        self.df_types_list = [[col_type for col_type in df.dtypes] for df in self.df_list]
+        self.df_types = [x for x in self.df.dtypes]
+
+    def add(self):
+        record = pd.Series(["", 0, 0, 0, "", 0, 0, 0, "", ""], index=self.df.columns)
+        self.df = self.df.append(record, ignore_index=True)
+        self.define_df()
+
+    def delete(self, index_df, row):
+        temp_df = self.df_list[index_df]
+        if index_df == 0:
+            self.df = self.df.loc[self.df["Трек ID"] != temp_df.iloc[row]["Трек ID"]]
+        elif index_df == 1:
+            self.df = self.df.loc[self.df["Альбом ID"] != temp_df.iloc[row]["Альбом ID"]]
+        elif index_df == 2:
+            self.df = self.df.loc[self.df["Артист ID"] != temp_df.iloc[row]["Артист ID"]]
+        else:
+            self.df = self.df.loc[self.df["Жанр ID"] != temp_df.iloc[row]["Жанр ID"]]
+        self.define_df()
+
+    def define_df(self):
+        self.df_tracks = self.df[["Трек ID", "Название", "Альбом ID", "Прослушиваний"]].drop_duplicates().reset_index(drop=True)
+        self.df_albums = self.df[["Название альбома", "Альбом ID", "Жанр ID", "Артист ID","Стоимость"]].drop_duplicates().reset_index(drop=True)
+        self.df_artists = self.df[["Имя артиста", "Артист ID"]].drop_duplicates().reset_index(drop=True)
+        self.df_genres = self.df[["Название жанра", "Жанр ID"]].drop_duplicates().reset_index(drop=True)
+        self.df_list = [self.df_tracks, self.df_albums, self.df_artists, self.df_genres]
+        self.df_names = ["Треки", "Альбомы", "Артисты", "Жанры"]
+
+    def transform_type(self):
+        for i, column in enumerate(self.df.columns):
+            self.df = self.df.astype({column:self.df_types[i]})
+
+class TableManage(DataBase):
+    def __init__(self, root):
+        super().__init__("data/tracks1.xlsx")
+
+        self.manager = ttk.Frame(root)
+        self.manager.grid(column=0, row=0)
+
+        self.choice_data = tk.IntVar()
+        self.choice_data.set(0)
         
+        self.widgets_entry = np.empty(shape=(self.df.shape[0], self.df.shape[1]), dtype="O") 
+        
+        self.init_menu()
+        self.init_table()
+
+        self.manager.grid_columnconfigure(0, weight=1, uniform="group1")
+        self.manager.rowconfigure(0, weight=1)
+        self.manager.grid_columnconfigure(1, weight=1, uniform="group1")
+
+    def init_table(self):
+        temp = self.df_list[self.choice_data.get()].copy()
+        self.table = Table(self.manager, temp)
+        self.table.grid(column=0, row=0, sticky="nsew")
+
+    def save_change(self):
+        df = self.table.get_df()
+        print(self.df_list[self.choice_data.get()]["Альбом ID"])
+        if self.check_types(df):
+            for i in range(self.df.shape[0]):
+                for column in df.columns:
+
+                    for x, value in enumerate(self.df_list[self.choice_data.get()][column]):
+                        if self.df.iloc[i, self.df.columns.get_loc(column)] == value:
+                            self.df.iloc[i, self.df.columns.get_loc(column)] == df[column][x]
+                        # if self.df.iloc[i, j] == value:
+                        #     self.df.iloc[i, j] = df[column][x]
+
+
+            print(self.df)
+            self.define_df()
+            self.transform_type()
+            self.init_table()
+
+    def check_types(self, df):
+        types = self.df_types_list[self.choice_data.get()]
+        try:
+            for i in range(df.shape[0]):
+                for j in range(df.shape[1]):
+                    entry = df.iloc[i, j]
+                    if types[j] == np.dtype("int64"):
+                        int(entry)
+
+                    elif types[j] == np.dtype('float64'):
+                        float(entry)
+
+                    elif types[j] == np.dtype('datetime64[ns]'):
+                        datetime.strptime(entry, "%Y-%m-%d") 
+            return True
+        except:
+            mb.showerror(
+                "Ошибка", 
+                "Ты ввел данные не того типа!")
+            return False
+
+    def add_record(self):
+        self.add()
+        self.init_table()
+        print(self.df)
+
+    def delete_record(self):
+        df = self.df_list[self.choice_data.get()]
+        entry = int(self.delete_entry.get())
+        if 0 <= entry and entry < df.shape[0]:
+            self.delete(self.choice_data.get(), entry)
+            self.init_table()
+        else:
+            mb.showerror(
+                "Ошибка", 
+                "Ты ввел неверные данные!")
+        self.delete_entry.delete(0, 'end')
+
+
+    def init_menu(self):
+        menu = ttk.Frame(self.manager)
+        menu.grid(column=1, row=0, sticky="nsew")
+
+        label_choose = ttk.Label(menu, text="Выберите базу данных: ")
+        label_choose.grid(column=0, row=0, padx=10, pady=10, sticky="nw")
+
+        row_iter = 0
+
+        for i in range(len(self.df_list)):
+            radiobutton_choice = ttk.Radiobutton(menu, text=self.df_names[i], variable=self.choice_data, value=i, command=self.init_table)
+            radiobutton_choice.grid(column=1, row=row_iter, padx=10, pady=10, sticky="nw")
+            row_iter+=1
+
+        add_button = ttk.Button(menu, text="Добавить", command=self.add_record)
+        add_button.grid(column=0, row=row_iter, padx=10, pady=10, sticky="nw")
+
+        delete_button = ttk.Button(menu, text="Удалить", command=self.delete_record)
+        delete_button.grid(column=1, row=row_iter, padx=10, pady=10, sticky="nw")
+
+        self.delete_entry = ttk.Entry(menu)
+        self.delete_entry.grid(column=2, row=row_iter)
+
+        save_change = ttk.Button(menu, text="Применить изменения", command=self.save_change)
+        save_change.grid(column=3, row=row_iter)
+
+    def get_frame(self):
+        return self.manager
+
+
 def update_df():
-    df_list = [tracks.get_upd_df(), albums.get_upd_df(), artists.get_upd_df(), genres.get_upd_df()]
+    df = tracks.get_upd_df().merge(albums.get_upd_df(), left_on="Альбом ID", right_on="Альбом ID", how="outer")
+    df = df.merge(artists.get_upd_df(), left_on="Артист ID", right_on="Артист ID", how="outer")
+    df = df.merge(genres.get_upd_df(), left_on="Жанр ID", right_on="Жанр ID", how="outer")
+    print(df)
+    df = df.dropna().reset_index(drop=True)
+    print(df)
+    df_tracks = df[["Название", "Альбом ID", "Прослушиваний"]].drop_duplicates().reset_index(drop=True)
+    df_albums = df[["Название альбома", "Альбом ID", "Жанр ID", "Артист ID", "Стоимость"]].drop_duplicates().reset_index(drop=True)
+    df_artists = df[["Имя артиста", "Артист ID"]].drop_duplicates().reset_index(drop=True)
+    df_genres = df[["Название жанра", "Жанр ID"]].drop_duplicates().reset_index(drop=True)
+
+    df_list = [df_tracks, df_albums, df_artists, df_genres] 
+
+    tracks.df = df_tracks
+    albums.df = df_albums
+    artists.df = df_artists
+    genres.df = df_genres
+
     select_data.df_list = df_list
     static_data.df_list = df_list
     pivot_table.df_list = df_list
 
-
-file_path = "output/"
-df_tracks = pd.read_excel("data/tracks.xlsx")
-df_albums = pd.read_excel("data/albums.xlsx")
-df_artists = pd.read_excel("data/artists.xlsx")
-df_genres = pd.read_excel("data/genres.xlsx")
-df = pd.read_excel("data/tracks1.xlsx")
-
-df_list = [df_tracks, df_albums, df_artists, df_genres]
-df_names = ["Треки", "Альбомы", "Артисты", "Жанры"]
+    graph_bar.df = df
+    graph_hist.df = df 
 
 root = tk.Tk()
 root.geometry('1200x600+200+150')
 root.title("Менеджер")
+
 n = ttk.Notebook(root, width=root.winfo_screenwidth(), height=root.winfo_screenheight())
 
-tracks = TableManage(root, df_tracks, file_path)
-albums = TableManage(root, df_albums, file_path)
-artists = TableManage(root, df_artists, file_path)
-genres = TableManage(root, df_genres, file_path)
+data = TableManage(root)
+frame = data.get_frame()
 
-select_data = SampleData(root, df_list, df_names, file_path)
-static_data = StaticData(root, df_list, df_names, file_path)
-pivot_table = PivotTable(root, df_list, df_names, file_path)
-graph_bar = BarPlot(root, df, "graphics/")
-graph_hist = HistPlot(root, df, "graphics/")
+select_data = SampleData(root, data.df_list, data.df_names, "output/")
+static_data = StaticData(root, data.df_list, data.df_names, "output/")
+pivot_table = PivotTable(root, data.df_list, data.df_names, "output/")
+graph_bar = BarPlot(root, data.df, "graphics/")
+graph_hist = HistPlot(root, data.df, "graphics/")
 
-n.add(tracks, text='Треки')
-n.add(albums, text='Альбомы')
-n.add(artists, text='Артисты')
-n.add(genres, text='Жанры')
+n.add(frame, text="Данные")
+# n.add(tracks, text='Треки')
+# n.add(albums, text='Альбомы')
+# n.add(artists, text='Артисты')
+# n.add(genres, text='Жанры')
 n.add(select_data, text='Выборка данных')
 n.add(static_data, text='Статистический отчет')
 n.add(pivot_table, text="Сводная таблица")
