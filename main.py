@@ -952,6 +952,8 @@ class HistPlot(DataBase):
     def __init__(self, parent, file_path):
         self.df = self.get_full_df()
 
+        self.frame = ttk.Frame(parent)
+
         self.file_path = file_path
         
         self.df_types = self.get_df_types()
@@ -963,6 +965,10 @@ class HistPlot(DataBase):
         self.define_quantity_attr()
         self.init_manager()
         mt.use('TkAgg')
+
+    def transform_type(self):
+        for i, column in enumerate(self.df.columns):
+            self.df = self.df.astype({column:self.df_types[i]})
 
     def define_quality_attr(self):
         self.quality_attributes = []
@@ -977,31 +983,33 @@ class HistPlot(DataBase):
                self.quantity_attributes.append(self.df.columns[i]) 
 
     def init_graph(self):
-        try:
-            plt.style.use('ggplot')
-            plt.rcParams['font.size'] = '7'
+        self.df = self.get_full_df()
+        self.transform_type()
+        #try:
+        plt.style.use('ggplot')
+        plt.rcParams['font.size'] = '7'
 
-            fig = plt.figure(figsize=(10, 4.4), dpi=100)
+        fig = plt.figure(figsize=(10, 4.4), dpi=100)
 
-            canvas = FigureCanvasTkAgg(fig, master=self)
-            plot_widget = canvas.get_tk_widget()
-            plot_widget.grid(column=0, row=1, padx=20, sticky="e")
+        canvas = FigureCanvasTkAgg(fig, master=self.frame)
+        plot_widget = canvas.get_tk_widget()
+        plot_widget.grid(column=0, row=1, padx=20, sticky="e")
 
-            names = list(self.df[self.qual_attr.get()].unique())
-            values = []
-            for x in names:
-                values_x = list(self.df[self.df[self.qual_attr.get()] == x][self.quan_attr.get()])
-                values.append(values_x)
-            plt.hist(values, bins=int(180/15), label=names, density=True)
-            plt.legend()
-            plt.tight_layout()
-        except:
-            mb.showerror(
-                "Ошибка", 
-                "Ты ввел неверные данные!")
+        names = list(self.df[self.qual_attr.get()].unique())
+        values = []
+        for x in names:
+            values_x = list(self.df[self.df[self.qual_attr.get()] == x][self.quan_attr.get()])
+            values.append(values_x)
+        plt.hist(values, bins=int(180/15), label=names, density=True)
+        plt.legend()
+        plt.tight_layout()
+        # except:
+        #     mb.showerror(
+        #         "Ошибка", 
+        #         "Ты ввел неверные данные!")
         
     def init_manager(self):
-        manager = ttk.Frame(self)
+        manager = ttk.Frame(self.frame)
         manager.grid(column=0, row=0)
 
         label_choice = ttk.Label(manager, text="Выберите качественный атрибут: ")
@@ -1036,6 +1044,109 @@ class HistPlot(DataBase):
 
         self.save_default()
 
+    def get_frame(self):
+        return self.frame
+
+class BoxVisk(DataBase):
+    def __init__(self, parent, file_path):
+        self.df = self.get_full_df()
+
+        self.frame = ttk.Frame(parent)
+
+        self.file_path = file_path
+        
+        self.df_types = self.get_df_types()
+
+        self.qual_attr = tk.StringVar()
+        self.quan_attr = tk.StringVar()
+
+        self.define_quality_attr()
+        self.define_quantity_attr()
+        self.init_manager()
+        mt.use('TkAgg')
+
+    def transform_type(self):
+        for i, column in enumerate(self.df.columns):
+            self.df = self.df.astype({column:self.df_types[i]})
+
+    def define_quality_attr(self):
+        self.quality_attributes = []
+        for i in range(len(self.df.columns)):
+            if self.df_types[i] == "O":
+               self.quality_attributes.append(self.df.columns[i])
+
+    def define_quantity_attr(self):
+        self.quantity_attributes = []
+        for i in range(len(self.df.columns)):
+            if self.df_types[i] == "int64" or self.df_types[i] == "float64":
+               self.quantity_attributes.append(self.df.columns[i]) 
+
+    def init_graph(self):
+        self.df = self.get_full_df()
+        self.transform_type()
+        try:
+            plt.style.use('ggplot')
+            plt.rcParams['font.size'] = '7'
+
+            fig = plt.figure(figsize=(10, 4.4), dpi=100)
+
+            canvas = FigureCanvasTkAgg(fig, master=self.frame)
+            plot_widget = canvas.get_tk_widget()
+            plot_widget.grid(column=0, row=1, padx=20, sticky="e")
+
+            names = list(self.df[self.qual_attr.get()].unique())
+            values = []
+            for x in names:
+                values_x = list(self.df[self.df[self.qual_attr.get()] == x][self.quan_attr.get()])
+                values.append(values_x)
+            plt.boxplot(values, vert=True, labels=names)
+            plt.tight_layout()
+        except:
+            mb.showerror(
+                "Ошибка", 
+                "Ты ввел неверные данные!")
+        
+    def init_manager(self):
+        manager = ttk.Frame(self.frame)
+        manager.grid(column=0, row=0)
+
+        label_choice = ttk.Label(manager, text="Выберите качественный атрибут: ")
+        label_choice.grid(column=0, row=0, padx=10, pady=10)
+
+        first_choice_rad = ttk.Combobox(manager, textvariable=self.qual_attr, state="readonly", values=self.quality_attributes)
+        first_choice_rad.grid(column=1, row=0, padx=10, pady=10)
+
+        label_choice = ttk.Label(manager, text="Выберите количественный атрибут: ")
+        label_choice.grid(column=2, row=0, padx=10, pady=10)
+
+        second_choice_rad = ttk.Combobox(manager, textvariable=self.quan_attr, state="readonly", values=self.quantity_attributes)
+        second_choice_rad.grid(column=3, row=0, padx=10, pady=10)
+
+        button_apply = ttk.Button(manager, text="Применить", command=self.init_graph)
+        button_apply.grid(column=4, row=0, padx=10, pady=10)
+
+        button_save_csv = ttk.Button(manager, text="Сохранить", command=self.save)
+        button_save_csv.grid(column=5, row=0, padx=10, pady=10, sticky="e")
+
+    def save_default(self):
+        file_name_default = datetime.now().strftime("%Y%m%d-%H%M%S")
+        f_default = self.file_path+file_name_default+".png"
+        plt.savefig(f_default)
+
+    def save(self):
+        file_name = fd.asksaveasfilename(
+            filetypes=(("PNG files", "*.png"),
+                    ("All files", "*.*")))
+        f = open(file_name, 'w')
+        plt.savefig(file_name)
+
+        self.save_default()
+
+    def get_frame(self):
+        return self.frame
+
+class Scatter(DataBase):
+    
 root = tk.Tk()
 root.geometry('1200x600+200+150')
 root.title("Менеджер")
@@ -1049,7 +1160,8 @@ select_data = SampleData(root).get_frame()
 static_data = StaticData(root, "output/")
 pivot_table = PivotTable(root, "output/").get_frame()
 graph_bar = BarPlot(root, "graphics/").get_frame()
-graph_hist = HistPlot(root, manager.df, "graphics/")
+graph_hist = HistPlot(root,"graphics/").get_frame()
+graph_box = BoxVisk(root, "graphics/").get_frame()
 
 n.add(frame, text="Данные")
 n.add(select_data, text='Выборка данных')
@@ -1057,6 +1169,7 @@ n.add(static_data, text='Статистический отчет')
 n.add(pivot_table, text="Сводная таблица")
 n.add(graph_bar, text="Столбчатая диаграмма")
 n.add(graph_hist, text="Гистограмма")
+n.add(graph_box, text="Диаграмма Бокса-Уискера")
 
 n.pack()
 root.mainloop()
