@@ -14,6 +14,100 @@ from datetime import datetime
 
 
 
+class DataBase:
+    df = pd.DataFrame()
+    df_list = []
+    df_names = []
+    df_types = []
+    
+    def __init__(self, path):
+        self.df = pd.read_excel(path)
+        self.define_df()
+        self.df_types_list = [[col_type for col_type in df.dtypes] for df in self.df_list]
+        self.df_types = [x for x in self.df.dtypes]
+        DataBase.df_types = self.df_types
+
+    def add(self):
+        record = pd.Series(["", 0, 0, 0, "", 0, 0, 0, "", ""], index=self.df.columns)
+        self.df = self.df.append(record, ignore_index=True)
+        self.define_df()
+
+    def delete(self, index_df, row):
+        temp_df = self.df_list[index_df]
+        if index_df == 0:
+            self.df = self.df.loc[self.df["Трек ID"] != temp_df.iloc[row]["Трек ID"]]
+        elif index_df == 1:
+            self.df = self.df.loc[self.df["Альбом ID"] != temp_df.iloc[row]["Альбом ID"]]
+        elif index_df == 2:
+            self.df = self.df.loc[self.df["Артист ID"] != temp_df.iloc[row]["Артист ID"]]
+        else:
+            self.df = self.df.loc[self.df["Жанр ID"] != temp_df.iloc[row]["Жанр ID"]]
+        self.define_df()
+
+    def define_df(self):
+        self.df_tracks = self.df[["Трек ID", "Название", "Альбом ID", "Прослушиваний"]].drop_duplicates().reset_index(drop=True)
+        self.df_albums = self.df[["Название альбома", "Альбом ID", "Жанр ID", "Артист ID","Стоимость", "Место создания"]].drop_duplicates().reset_index(drop=True)
+        self.df_artists = self.df[["Имя артиста", "Артист ID", "Рейтинг"]].drop_duplicates().reset_index(drop=True)
+        self.df_genres = self.df[["Название жанра", "Жанр ID"]].drop_duplicates().reset_index(drop=True)
+        self.df_list = [self.df_tracks, self.df_albums, self.df_artists, self.df_genres]
+        self.df_names = ["Треки", "Альбомы", "Артисты", "Жанры"]
+        DataBase.df = self.df
+        DataBase.df_list = self.df_list
+        DataBase.df_names = self.df_names
+
+    def transform_type(self):
+        for i, column in enumerate(self.df.columns):
+            self.df = self.df.astype({column:self.df_types[i]})
+
+    def save_default(self, format):
+        file_name_default = datetime.now().strftime("%Y%m%d-%H%M%S")
+        f_default = open("output/"+file_name_default+format, 'w', encoding='utf-8')
+        return f_default
+
+    def save_as_csv(self):
+        file_name = fd.asksaveasfilename(
+        filetypes=(("CSV files", "*.csv"),
+                   ("All files", "*.*")))
+        f = open(file_name, 'w')
+        self.df.to_csv(file_name, sep = ",", index = False)
+        f.close()
+
+        self.df.to_csv(self.save_default(".csv"), index = False)
+
+    def save_as_xlsx(self):
+        file_name = fd.asksaveasfilename(
+        filetypes=(("Excel files", "*.xls"),
+                   ("All files", "*.*")))
+        f = open(file_name, 'w')
+        writer = pd.ExcelWriter(file_name, engine='xlsxwriter')
+        self.df.to_excel(writer, index = False, encoding='utf-8')
+        writer.save()
+        f.close()
+
+        file_name_default = datetime.now().strftime("%Y%m%d-%H%M%S")
+        self.df.to_excel("output/"+file_name_default+".xlsx", index = False)
+    
+    def save_as_pic(self):
+        file_name = fd.asksaveasfilename(
+        filetypes=(("Picle files", "*.pic"),
+                   ("All files", "*.*")))
+        f = open(file_name, 'w')
+        self.df.to_pickle(file_name)
+        f.close()
+
+        self.df.to_pickle(self.save_default(".pic"), index=False)
+
+    @classmethod
+    def get_full_df(cls):
+        return cls.df
+    
+    @classmethod
+    def get_list_names_df(cls):
+        return cls.df_list, cls.df_names
+
+    @classmethod
+    def get_df_types(cls):
+        return cls.df_types
 
 class Table(ttk.Frame):
 
@@ -70,13 +164,134 @@ class Table(ttk.Frame):
         print(self.df)
         return self.df
 
-class SampleData(ttk.Frame):
+class TableManage(DataBase):
+    def __init__(self, root):
+        super().__init__("data/tracks1.xlsx")
 
-    def __init__(self, parent, df_list, df_names, file_path):
-        super().__init__(parent)
-        self.file_path = file_path
-        self.df_names = df_names
-        self.df_list = df_list
+        self.manager = ttk.Frame(root)
+        self.manager.grid(column=0, row=0)
+
+        self.choice_data = tk.IntVar()
+        self.choice_data.set(0)
+        
+        self.widgets_entry = np.empty(shape=(self.df.shape[0], self.df.shape[1]), dtype="O") 
+        
+        self.init_menu()
+        self.init_table()
+
+        self.manager.grid_columnconfigure(0, weight=1, uniform="group1")
+        self.manager.rowconfigure(0, weight=1)
+        self.manager.grid_columnconfigure(1, weight=1, uniform="group1")
+
+    def init_table(self):
+        temp = self.df_list[self.choice_data.get()].copy()
+        self.table = Table(self.manager, temp)
+        self.table.grid(column=0, row=0, sticky="nsew")
+
+    def save_change(self):
+        df = self.table.get_df()
+        if self.check_types(df):
+            for i in range(self.df.shape[0]):
+                for column in df.columns:
+
+                    for x, value in enumerate(self.df_list[self.choice_data.get()][column]):
+                        if self.df.iloc[i, self.df.columns.get_loc(column)] == value:
+                            self.df.iloc[i, self.df.columns.get_loc(column)] = df[column][x]
+                        # if self.df.iloc[i, j] == value:
+                        #     self.df.iloc[i, j] = df[column][x]
+
+
+            self.define_df()
+            self.transform_type()
+            self.init_table()
+
+    def check_types(self, df):
+        types = self.df_types_list[self.choice_data.get()]
+        try:
+            for i in range(df.shape[0]):
+                for j in range(df.shape[1]):
+                    entry = df.iloc[i, j]
+                    if types[j] == np.dtype("int64"):
+                        int(entry)
+
+                    elif types[j] == np.dtype('float64'):
+                        float(entry)
+
+                    elif types[j] == np.dtype('datetime64[ns]'):
+                        datetime.strptime(entry, "%Y-%m-%d") 
+            return True
+        except:
+            mb.showerror(
+                "Ошибка", 
+                "Ты ввел данные не того типа!")
+            return False
+
+    def add_record(self):
+        self.add()
+        self.init_table()
+        print(self.df)
+
+    def delete_record(self):
+        df = self.df_list[self.choice_data.get()]
+        entry = int(self.delete_entry.get())
+        if 0 <= entry and entry < df.shape[0]:
+            self.delete(self.choice_data.get(), entry)
+            self.init_table()
+        else:
+            mb.showerror(
+                "Ошибка", 
+                "Ты ввел неверные данные!")
+        self.delete_entry.delete(0, 'end')
+
+    def init_menu(self):
+        menu = ttk.Frame(self.manager)
+        menu.grid(column=1, row=0, sticky="nsew")
+
+        label_choose = ttk.Label(menu, text="Выберите базу данных: ")
+        label_choose.grid(column=0, row=0, padx=10, pady=10, sticky="nw")
+
+        row_iter = 0
+
+        for i in range(len(self.df_list)):
+            radiobutton_choice = ttk.Radiobutton(menu, text=self.df_names[i], variable=self.choice_data, value=i, command=self.init_table)
+            radiobutton_choice.grid(column=1, row=row_iter, padx=10, pady=10, sticky="nw")
+            row_iter+=1
+
+        add_button = ttk.Button(menu, text="Добавить", command=self.add_record)
+        add_button.grid(column=0, row=row_iter, padx=10, pady=10, sticky="nw")
+
+        delete_button = ttk.Button(menu, text="Удалить", command=self.delete_record)
+        delete_button.grid(column=1, row=row_iter, padx=10, pady=10, sticky="nw")
+
+        self.delete_entry = ttk.Entry(menu)
+        self.delete_entry.grid(column=2, row=row_iter, padx=10, pady=10, sticky="nw")
+
+        save_change = ttk.Button(menu, text="Применить изменения", command=self.save_change)
+        save_change.grid(column=3, row=row_iter, padx=10, pady=10, sticky="nw")
+
+        label_save_as = ttk.Label(menu, text="Сохранить как: ")
+        label_save_as.grid(column=0, row=row_iter+1, padx=10, pady=10)
+
+        button_save_csv = ttk.Button(menu, text=".csv", command=self.save_as_csv)
+        button_save_csv.grid(column=1, row=row_iter+1, padx=10, pady=10, sticky="e")
+
+        button_save_xlsx = ttk.Button(menu, text=".xlsx", command=self.save_as_xlsx)
+        button_save_xlsx.grid(column=2, row=row_iter+1, padx=10, pady=10)
+
+        button_save_pic = ttk.Button(menu, text=".pic", command=self.save_as_pic)
+        button_save_pic.grid(column=3, row=row_iter+1, padx=10, pady=10)
+
+    def get_frame(self):
+        return self.manager
+
+class SampleData(DataBase):
+
+    def __init__(self, parent):
+        self.df = self.get_full_df()
+        self.df_list, self.df_names = self.get_list_names_df()
+        self.menu = ttk.Frame(parent)
+        self.menu.grid(column=0, row=0)
+
         self.df_curr = self.df_list[0]
         self.df_change_curr = self.df_curr
 
@@ -85,26 +300,26 @@ class SampleData(ttk.Frame):
 
         self.choice_attr = np.empty(shape=(self.df_curr.shape[1]), dtype="O")
 
-        self.grid(column=0, row=0)
-
         self.init_manager()
 
-        self.grid_columnconfigure(0, weight=1, uniform="group1")
-        self.rowconfigure(0, weight=1)
-        self.grid_columnconfigure(1, weight=1, uniform="group1")
+        self.menu.grid_columnconfigure(0, weight=1, uniform="group1")
+        self.menu.rowconfigure(0, weight=1)
+        self.menu.grid_columnconfigure(1, weight=1, uniform="group1")
 
     def init_table(self, df):
-        table = Table(self, df)
+        table = Table(self.menu, df)
         table.grid(column=0, row=0, sticky="nsew")
 
     def change_main_base(self):
+        self.df = self.get_full_df()
+        self.df_list, self.df_names = self.get_list_names_df()
         self.df_curr = self.df_list[self.choice_data.get()]
         self.choice_attr = np.empty(shape=(self.df_curr.shape[1]), dtype="O")
         self.init_table(self.df_curr)
         self.init_manager()
 
     def init_manager(self):
-        manager = ttk.Frame(self)
+        manager = ttk.Frame(self.menu)
         manager.grid(column=1, row=0, sticky="nsew")
 
         label_choose = ttk.Label(manager, text="Выберите базу данных: ")
@@ -149,7 +364,7 @@ class SampleData(ttk.Frame):
 
     def save_default(self, format):
         file_name_default = datetime.now().strftime("%Y%m%d-%H%M%S")
-        f_default = open(self.file_path+file_name_default+format, 'w', encoding='utf-8')
+        f_default = open("output/"+file_name_default+format, 'w', encoding='utf-8')
         return f_default
 
     def save_as_csv(self):
@@ -173,7 +388,7 @@ class SampleData(ttk.Frame):
         f.close()
 
         file_name_default = datetime.now().strftime("%Y%m%d-%H%M%S")
-        self.df_change_curr.to_excel(self.file_path+file_name_default+".xlsx", index = False)
+        self.df_change_curr.to_excel("output/"+file_name_default+".xlsx", index = False)
     
     def save_as_pic(self):
         file_name = fd.asksaveasfilename(
@@ -184,226 +399,20 @@ class SampleData(ttk.Frame):
         f.close()
 
         self.df_change_curr.to_pickle(self.save_default(".pic"), index=False)
-
-class sTableManage(ttk.Frame):
- 
-    def __init__(self, parent, df, file_path):
-        super().__init__(parent)
-        self.df = df
-        self.file_path = file_path #file name for default saving
-        self.df_types = [x for x in df.dtypes]
-        self.grid(column=0, row=0)
-
-        self.hight = df.shape[0]
-        self.width = df.shape[1]
-
-        self.widgets_entry = np.empty(shape=(self.hight, self.width), dtype="O")    #widgets to show values of the table
-        self.values_df = np.empty(shape=(self.hight, self.width), dtype="O")        #values of the table
-        self.widgets_entry_insert = np.empty(shape=(self.df.shape[1]), dtype="O")   #widgets for insert in the table
-
-        self.init_table()
-        self.init_manager()
-
-        self.grid_columnconfigure(0, weight=1, uniform="group1")
-        self.rowconfigure(0, weight=1)
-        self.grid_columnconfigure(1, weight=1, uniform="group1")
- 
-    def init_table(self):
-
-        table = Table(self, self.df)
-        table.grid(column=0, row=0, sticky="nsew")
-
-        self.widgets_entry = table.widgets_entry
-        self.values_df = table.values_df
-                
-    def init_manager(self):
-        #editor table
-        menu = ttk.Frame(self)
-        menu.grid(column=1, row=0, sticky="nsew")
-        
-        button_save = ttk.Button(menu, text="Применить", command=self.save_changes)
-        button_save.grid(column=0, row=0, padx=10, pady=10)
-
-        label_delete = ttk.Label(menu, text="Введите номер строчки для удаления: ")
-        label_delete.grid(column=0, row=1, padx=10, pady=10)
-
-        self.entry_to_delete = ttk.Entry(menu)
-        self.entry_to_delete.grid(column=1, row=1, padx=10, pady=10)
-
-        button_delete = ttk.Button(menu, text="Удалить", command=self.delete)
-        button_delete.grid(column=2, row=1, padx=10, pady=10)
-
-        label_delete = ttk.Label(menu, text="Введите данные строчки для добавления: ")
-        label_delete.grid(column=0, row=2, padx=10, pady=10)
-
-        for i, column in enumerate(self.df.columns):
-            label_column = ttk.Label(menu, text=column)
-            label_column.grid(column=0, row=3+i, padx=10, pady=10)
-
-        for i in range(self.df.shape[1]):
-            self.widgets_entry_insert[i] = ttk.Entry(menu)
-            self.widgets_entry_insert[i].grid(column=1, row=3+i, padx=10, pady=10)
-
-        button_save_insert = ttk.Button(menu, text="Добавить", command=self.save_insert)
-        button_save_insert.grid(column=2, row = self.width+2, padx=10, pady=10)
-
-        label_save_as = ttk.Label(menu, text="Сохранить как: ")
-        label_save_as.grid(column=0, row=self.width+3, padx=10, pady=10)
-
-        button_save_csv = ttk.Button(menu, text=".csv", command=self.save_as_csv)
-        button_save_csv.grid(column=1, row=self.width+3, padx=10, pady=10, sticky="e")
-
-        button_save_xlsx = ttk.Button(menu, text=".xlsx", command=self.save_as_xlsx)
-        button_save_xlsx.grid(column=2, row=self.width+3, padx=10, pady=10)
-
-        button_save_pic = ttk.Button(menu, text=".pic", command=self.save_as_pic)
-        button_save_pic.grid(column=3, row=self.width+3, padx=10, pady=10)
-
-    def save_default(self, format):
-        file_name_default = datetime.now().strftime("%Y%m%d-%H%M%S")
-        f_default = open(self.file_path+file_name_default+format, 'w', encoding='utf-8')
-        return f_default
-
-    def save_as_csv(self):
-        file_name = fd.asksaveasfilename(
-        filetypes=(("CSV files", "*.csv"),
-                   ("All files", "*.*")))
-        f = open(file_name, 'w')
-        self.df.to_csv(file_name, sep = ",", index = False)
-        f.close()
-
-        self.df.to_csv(self.save_default(".csv"), index = False)
-
-    def save_as_xlsx(self):
-        file_name = fd.asksaveasfilename(
-        filetypes=(("Excel files", "*.xls"),
-                   ("All files", "*.*")))
-        f = open(file_name, 'w')
-        writer = pd.ExcelWriter(file_name, engine='xlsxwriter')
-        self.df.to_excel(writer, index = False, encoding='utf-8')
-        writer.save()
-        f.close()
-
-        file_name_default = datetime.now().strftime("%Y%m%d-%H%M%S")
-        self.df.to_excel(self.file_path+file_name_default+".xlsx", index = False)
     
-    def save_as_pic(self):
-        file_name = fd.asksaveasfilename(
-        filetypes=(("Picle files", "*.pic"),
-                   ("All files", "*.*")))
-        f = open(file_name, 'w')
-        self.df.to_pickle(file_name)
-        f.close()
+    def get_frame(self):
+        return self.menu
 
-        self.df.to_pickle(self.save_default(".pic"), index=False)
-
-    def delete(self):
-        entry = self.entry_to_delete.get()
-        try:
-            self.df = self.df.drop(index=[int(entry)])
-            self.df = self.df.reset_index(drop=True)
-
-            self.init_table()
-            update_df()
-        except (ValueError,KeyError):
-            mb.showerror(
-                "Ошибка", 
-                "Ты ввел неверные данные!")
-        self.entry_to_delete.delete(0, 'end')
-
-    def clear(self, entries):
-        for i in range(len(entries)):
-            entries[i].delete(0, 'end')
-
-    def transform_type(self, df, df_types):
-        for i, column in enumerate(df.columns):
-            df = df.astype({column:df_types[i]})
-        return df
-
-    def save_insert(self):
-        self.hight = self.df.shape[0]
-        self.width = self.df.shape[1]
-        
-        try:
-            for j in range(self.width): #check empty entries
-                entry = self.widgets_entry_insert[j].get()
-                
-                if not entry:
-                    raise ValueError  
-
-                elif self.df_types[j] == np.dtype('int64'):
-                    int(entry)
-
-                elif self.df_types[j] == np.dtype('float64'):
-                    float(entry)
-
-                elif self.df_types[j] == np.dtype('datetime64[ns]'):
-                    datetime.strptime(entry, "%Y-%m-%d")       
-
-            for j, column in enumerate(self.df.columns): 
-                self.df.loc[self.hight, column] = self.widgets_entry_insert[j].get()
-
-            self.df = self.transform_type(self.df, self.df_types)
-            self.df = self.df.reset_index(drop=True)
-
-            if self.df.duplicated().any():
-                self.df = self.df.drop(index=[self.hight])
-                raise Exception
-
-            self.init_table()
-            update_df()
-        except ValueError:
-            mb.showerror(
-                "Ошибка", 
-                "Ты ввел данные не того типа!")
-        except Exception:
-            mb.showerror(
-                "Ошибка", 
-                "Такая строка уже присутствует!")
-
-        self.clear(self.widgets_entry_insert)
-
-    def save_changes(self):
-        self.hight = self.df.shape[0]
-        self.width = self.df.shape[1]
-
-        try:
-            for i in range(self.hight): 
-                for j in range(self.width): 
-                    entry = self.widgets_entry[i, j].get()
-
-                    if self.df_types[j] == np.dtype('int64'):
-                        int(entry)
-
-                    elif self.df_types[j] == np.dtype('float64'):
-                        float(entry)
-
-                    elif self.df_types[j] == np.dtype('datetime64[ns]'):
-                        datetime.strptime(entry, "%Y-%m-%d") 
-
-                    self.df.iloc[i, j] = entry
-
-            self.df = self.transform_type(self.df, self.df_types)
-            self.init_table()
-            update_df()
-        except ValueError:
-            mb.showerror(
-                "Ошибка", 
-                "Ты ввел данные не того типа!")
-
-    def get_upd_df(self):
-        return self.df
-
-class QualityData(ttk.Frame):
-    def __init__(self, parent, df_list, df_names, file_path):
-        super().__init__(parent)
-        self.df_list = df_list
+class QualityData(DataBase):
+    def __init__(self, parent, file_path):
+        self.df_list, self.df_names = self.get_list_names_df()
         self.file_path = file_path
-        self.df_names = df_names
+
+        self.frame = ttk.Frame(parent)
 
         self.df_curr = self.df_list[0] #current dataframe
         self.df_stat_curr = pd.DataFrame() #current statistic dataframe
-        self.df_types = [[col_type for col_type in df.dtypes] for df in df_list] #list of the types every dataframe
+        self.df_types = [[col_type for col_type in df.dtypes] for df in self.df_list] #list of the types every dataframe
         self.df_curr_types = self.df_types[0]   #current types of the current dataframe
 
         self.choice_data = tk.IntVar()  #choice of dataframe
@@ -417,15 +426,16 @@ class QualityData(ttk.Frame):
 
         self.init_manager()
 
-        self.grid_rowconfigure(0, weight=1, uniform="group1")
-        self.columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=1, uniform="group1")
+        self.frame.grid_rowconfigure(0, weight=1, uniform="group1")
+        self.frame.columnconfigure(0, weight=1)
+        self.frame.grid_rowconfigure(1, weight=1, uniform="group1")
 
     def init_table(self, df):
-        table = Table(self, df)
+        table = Table(self.frame, df)
         table.grid(column=0, row=1, sticky="nsew")
 
     def change_main_base(self):
+        self.df_list, self.df_names = self.get_list_names_df()
         self.df_curr = self.df_list[self.choice_data.get()]
         self.df_curr_types = self.df_types[self.choice_data.get()]
         self.define_quality_attr()
@@ -444,7 +454,7 @@ class QualityData(ttk.Frame):
                self.attr.append(self.df_curr.columns[i]) 
 
     def init_manager(self):
-        manager = ttk.Frame(self)
+        manager = ttk.Frame(self.frame)
         manager.grid(column=0, row=0, sticky="nsew")
 
         label_attr = ttk.Label(manager, text="Качественные атрибуты")
@@ -530,17 +540,19 @@ class QualityData(ttk.Frame):
         f.close()
 
         self.df_stat_curr.to_pickle(self.save_default(".pic"), index=False)
+    def get_frame(self):
+        return self.frame
 
-class QuantityData(ttk.Frame):
-    def __init__(self, parent, df_list, df_names, file_path):
-        super().__init__(parent)
-        self.df_list = df_list
+class QuantityData(DataBase):
+    def __init__(self, parent, file_path):
+        self.df_list, self.df_names = self.get_list_names_df()
         self.file_path = file_path
-        self.df_names = df_names
+        
+        self.frame = ttk.Frame(parent)
 
         self.df_curr = self.df_list[0] #current dataframe
         self.df_stat_curr = pd.DataFrame()
-        self.df_types = [[col_type for col_type in df.dtypes] for df in df_list] #list of the types every dataframe
+        self.df_types = [[col_type for col_type in df.dtypes] for df in self.df_list] #list of the types every dataframe
         self.df_curr_types = self.df_types[0]   #current types of the current dataframe
 
         self.choice_data = tk.IntVar()  #choice of dataframe
@@ -553,15 +565,16 @@ class QuantityData(ttk.Frame):
 
         self.init_manager()
 
-        self.grid_rowconfigure(0, weight=1, uniform="group1")
-        self.columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=1, uniform="group1")
+        self.frame.grid_rowconfigure(0, weight=1, uniform="group1")
+        self.frame.columnconfigure(0, weight=1)
+        self.frame.grid_rowconfigure(1, weight=1, uniform="group1")
 
     def init_table(self, df):
-        table = Table(self, df)
+        table = Table(self.frame, df)
         table.grid(column=0, row=1, sticky="nsew")
 
     def change_main_base(self):
+        self.df_list, self.df_names = self.get_list_names_df()
         self.df_curr = self.df_list[self.choice_data.get()]
         self.df_curr_types = self.df_types[self.choice_data.get()]
         self.transform_type()
@@ -591,7 +604,7 @@ class QuantityData(ttk.Frame):
         self.df_curr = self.df_curr[attr]
         
     def init_manager(self):
-        manager = ttk.Frame(self)
+        manager = ttk.Frame(self.frame)
         manager.grid(column=0, row=0, sticky="nsew")
 
         label_attr = ttk.Label(manager, text="Количественные атрибуты")
@@ -657,30 +670,32 @@ class QuantityData(ttk.Frame):
         f.close()
 
         self.df_stat_curr.to_pickle(self.save_default(".pic"), index=False)
+    def get_frame(self):
+        return self.frame
 
 class StaticData(ttk.Frame):
-    def __init__(self, parent, df_list, df_names, file_path):
+    def __init__(self, parent, file_path):
         super().__init__(parent)
         self.grid(column=0, row=0)
 
-        quality = QualityData(self, df_list, df_names, file_path)
+        quality = QualityData(self, file_path).get_frame()
         quality.grid(column=0, row=0, sticky="nsew")
-        quantity = QuantityData(self, df_list, df_names, file_path)
+        quantity = QuantityData(self, file_path).get_frame()
         quantity.grid(column=1, row=0, sticky="nsew")
 
         self.grid_columnconfigure(0, weight=1, uniform="group1")
         self.rowconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1, uniform="group1")
 
-class PivotTable(ttk.Frame):
-    def __init__(self, parent, df_list, df_names, file_path):
-        super().__init__(parent)
-        self.grid(column=0, row=0)
-        
-        self.df_names = df_names
-        self.df_list = df_list
-        self.df_curr = df_list[0]
-        self.df_types = [[col_type for col_type in df.dtypes] for df in df_list] #list of the types every dataframe
+class PivotTable(DataBase):
+    def __init__(self, parent, file_path):
+        self.df_list, self.df_names = self.get_list_names_df()
+
+        self.frame = ttk.Frame(parent)
+        self.frame.grid(column=0, row=0)
+ 
+        self.df_curr = self.df_list[0]
+        self.df_types = [[col_type for col_type in df.dtypes] for df in self.df_list] #list of the types every dataframe
         self.df_curr_types = self.df_types[0]
         self.file_path = file_path
 
@@ -698,11 +713,12 @@ class PivotTable(ttk.Frame):
 
         self.init_manager()
 
-        self.grid_columnconfigure(0, weight=1, uniform="group1")
-        self.rowconfigure(0, weight=1)
-        self.grid_columnconfigure(1, weight=1, uniform="group1")
+        self.frame.grid_columnconfigure(0, weight=1, uniform="group1")
+        self.frame.rowconfigure(0, weight=1)
+        self.frame.grid_columnconfigure(1, weight=1, uniform="group1")
 
     def change_main_base(self):
+        self.df_list, self.df_names = self.get_list_names_df()
         self.df_curr = self.df_list[self.choice_data.get()]
         self.df_curr_types = self.df_types[self.choice_data.get()]
         self.define_quality_attr()
@@ -721,7 +737,7 @@ class PivotTable(ttk.Frame):
                self.attr.append(self.df_curr.columns[i]) 
 
     def init_table(self, df):
-        table = Table(self, df)
+        table = Table(self.frame, df)
         table.grid(column=0, row=0, sticky="nsew")
 
     def change_table(self):
@@ -729,13 +745,13 @@ class PivotTable(ttk.Frame):
             index = [self.first_attr.get(), self.second_attr.get()]
 
             if self.aggfunc.get() == "Среднее":
-                df_update = pd.pivot_table(self.df_curr, index=index, aggfunc=np.mean, margins=True)
+                df_update = pd.pivot_table(self.df_curr, index=index, aggfunc=np.mean)
             elif self.aggfunc.get() == "Сумма":
-                df_update = pd.pivot_table(self.df_curr, index=index, aggfunc=np.sum, margins=True)
+                df_update = pd.pivot_table(self.df_curr, index=index, aggfunc=np.sum)
             elif self.aggfunc.get() == "Максимум":
-                df_update = pd.pivot_table(self.df_curr, index=index, aggfunc=np.max, margins=True)
+                df_update = pd.pivot_table(self.df_curr, index=index, aggfunc=np.max)
             elif self.aggfunc.get() == "Минимум":
-                df_update = pd.pivot_table(self.df_curr, index=index, aggfunc=np.min, margins=True)
+                df_update = pd.pivot_table(self.df_curr, index=index, aggfunc=np.min)
 
             self.df_update = df_update.reset_index()
             self.init_table(self.df_update)
@@ -745,7 +761,7 @@ class PivotTable(ttk.Frame):
                 "Ты ввел неверные данные!")
 
     def init_manager(self):
-        manager = ttk.Frame(self)
+        manager = ttk.Frame(self.frame)
         manager.grid(column=1, row=0, sticky="nsew")
 
         choice_dataframe = ttk.Label(manager, text="Выберите базу данных: ")
@@ -833,14 +849,19 @@ class PivotTable(ttk.Frame):
 
         self.df_update.to_pickle(self.save_default(".pic"), index=False)
 
-class BarPlot(ttk.Frame):
-    def __init__(self, parent, df, file_path):
-        super().__init__(parent)
+    def get_frame(self):
+        return self.frame
+
+class BarPlot(DataBase):
+    def __init__(self, parent, file_path):
+        self.df = self.get_full_df()
+
+        self.frame = ttk.Frame(parent)
+        self.frame.grid(column=0, row=0)
 
         self.file_path = file_path
         
-        self.df = df
-        self.df_types = [col_type for col_type in df.dtypes] 
+        self.df_types = self.get_df_types()
 
         self.qual_attr = tk.StringVar()
         self.quan_attr = tk.StringVar()
@@ -849,6 +870,10 @@ class BarPlot(ttk.Frame):
         self.define_quantity_attr()
         self.init_manager()
         mt.use('TkAgg')
+
+    def transform_type(self):
+        for i, column in enumerate(self.df.columns):
+            self.df = self.df.astype({column:self.df_types[i]})
 
     def define_quality_attr(self):
         self.quality_attributes = []
@@ -863,27 +888,30 @@ class BarPlot(ttk.Frame):
                self.quantity_attributes.append(self.df.columns[i]) 
 
     def init_graph(self):
-        try:
-            plt.style.use('ggplot')
-            plt.rcParams['font.size'] = '7'
+        self.df = self.get_full_df()
+        self.transform_type()
 
-            fig = plt.figure(figsize=(10, 4.4), dpi=100)
+        #try:
+        plt.style.use('ggplot')
+        plt.rcParams['font.size'] = '7'
 
-            canvas = FigureCanvasTkAgg(fig, master=self)
-            plot_widget = canvas.get_tk_widget()
-            plot_widget.grid(column=0, row=1, padx=20, sticky="e")
+        fig = plt.figure(figsize=(10, 4.4), dpi=100)
 
-            df = pd.pivot_table(self.df, index=[self.qual_attr.get()], values=[self.quan_attr.get()])
-            ax = fig.add_subplot()  
-            df.plot(kind='barh', legend=True, ax=ax)
-            plt.tight_layout()
-        except:
-            mb.showerror(
-                "Ошибка", 
-                "Ты ввел неверные данные!")
+        canvas = FigureCanvasTkAgg(fig, master=self.frame)
+        plot_widget = canvas.get_tk_widget()
+        plot_widget.grid(column=0, row=1, padx=20, sticky="e")
+
+        df = pd.pivot_table(self.df, index=[self.qual_attr.get()], values=[self.quan_attr.get()])
+        ax = fig.add_subplot()  
+        df.plot(kind='barh', legend=True, ax=ax)
+        plt.tight_layout()
+        # except:
+        #     mb.showerror(
+        #         "Ошибка", 
+        #         "Ты ввел неверные данные!")
         
     def init_manager(self):
-        manager = ttk.Frame(self)
+        manager = ttk.Frame(self.frame)
         manager.grid(column=0, row=0)
 
         label_choice = ttk.Label(manager, text="Выберите качественный атрибут: ")
@@ -913,19 +941,20 @@ class BarPlot(ttk.Frame):
         file_name = fd.asksaveasfilename(
             filetypes=(("PNG files", "*.png"),
                     ("All files", "*.*")))
-        f = open(file_name, 'w')
         plt.savefig(file_name)
 
         self.save_default()
 
-class HistPlot(ttk.Frame):
-    def __init__(self, parent, df, file_path):
-        super().__init__(parent)
+    def get_frame(self):
+        return self.frame
+
+class HistPlot(DataBase):
+    def __init__(self, parent, file_path):
+        self.df = self.get_full_df()
 
         self.file_path = file_path
         
-        self.df = df
-        self.df_types = [col_type for col_type in df.dtypes] 
+        self.df_types = self.get_df_types()
 
         self.qual_attr = tk.StringVar()
         self.quan_attr = tk.StringVar()
@@ -1007,200 +1036,22 @@ class HistPlot(ttk.Frame):
 
         self.save_default()
 
-class DataBase():
-    def __init__(self, path):
-        self.df = pd.read_excel(path)
-        self.define_df()
-        self.df_types_list = [[col_type for col_type in df.dtypes] for df in self.df_list]
-        self.df_types = [x for x in self.df.dtypes]
-
-    def add(self):
-        record = pd.Series(["", 0, 0, 0, "", 0, 0, 0, "", ""], index=self.df.columns)
-        self.df = self.df.append(record, ignore_index=True)
-        self.define_df()
-
-    def delete(self, index_df, row):
-        temp_df = self.df_list[index_df]
-        if index_df == 0:
-            self.df = self.df.loc[self.df["Трек ID"] != temp_df.iloc[row]["Трек ID"]]
-        elif index_df == 1:
-            self.df = self.df.loc[self.df["Альбом ID"] != temp_df.iloc[row]["Альбом ID"]]
-        elif index_df == 2:
-            self.df = self.df.loc[self.df["Артист ID"] != temp_df.iloc[row]["Артист ID"]]
-        else:
-            self.df = self.df.loc[self.df["Жанр ID"] != temp_df.iloc[row]["Жанр ID"]]
-        self.define_df()
-
-    def define_df(self):
-        self.df_tracks = self.df[["Трек ID", "Название", "Альбом ID", "Прослушиваний"]].drop_duplicates().reset_index(drop=True)
-        self.df_albums = self.df[["Название альбома", "Альбом ID", "Жанр ID", "Артист ID","Стоимость"]].drop_duplicates().reset_index(drop=True)
-        self.df_artists = self.df[["Имя артиста", "Артист ID"]].drop_duplicates().reset_index(drop=True)
-        self.df_genres = self.df[["Название жанра", "Жанр ID"]].drop_duplicates().reset_index(drop=True)
-        self.df_list = [self.df_tracks, self.df_albums, self.df_artists, self.df_genres]
-        self.df_names = ["Треки", "Альбомы", "Артисты", "Жанры"]
-
-    def transform_type(self):
-        for i, column in enumerate(self.df.columns):
-            self.df = self.df.astype({column:self.df_types[i]})
-
-class TableManage(DataBase):
-    def __init__(self, root):
-        super().__init__("data/tracks1.xlsx")
-
-        self.manager = ttk.Frame(root)
-        self.manager.grid(column=0, row=0)
-
-        self.choice_data = tk.IntVar()
-        self.choice_data.set(0)
-        
-        self.widgets_entry = np.empty(shape=(self.df.shape[0], self.df.shape[1]), dtype="O") 
-        
-        self.init_menu()
-        self.init_table()
-
-        self.manager.grid_columnconfigure(0, weight=1, uniform="group1")
-        self.manager.rowconfigure(0, weight=1)
-        self.manager.grid_columnconfigure(1, weight=1, uniform="group1")
-
-    def init_table(self):
-        temp = self.df_list[self.choice_data.get()].copy()
-        self.table = Table(self.manager, temp)
-        self.table.grid(column=0, row=0, sticky="nsew")
-
-    def save_change(self):
-        df = self.table.get_df()
-        print(self.df_list[self.choice_data.get()]["Альбом ID"])
-        if self.check_types(df):
-            for i in range(self.df.shape[0]):
-                for column in df.columns:
-
-                    for x, value in enumerate(self.df_list[self.choice_data.get()][column]):
-                        if self.df.iloc[i, self.df.columns.get_loc(column)] == value:
-                            self.df.iloc[i, self.df.columns.get_loc(column)] == df[column][x]
-                        # if self.df.iloc[i, j] == value:
-                        #     self.df.iloc[i, j] = df[column][x]
-
-
-            print(self.df)
-            self.define_df()
-            self.transform_type()
-            self.init_table()
-
-    def check_types(self, df):
-        types = self.df_types_list[self.choice_data.get()]
-        try:
-            for i in range(df.shape[0]):
-                for j in range(df.shape[1]):
-                    entry = df.iloc[i, j]
-                    if types[j] == np.dtype("int64"):
-                        int(entry)
-
-                    elif types[j] == np.dtype('float64'):
-                        float(entry)
-
-                    elif types[j] == np.dtype('datetime64[ns]'):
-                        datetime.strptime(entry, "%Y-%m-%d") 
-            return True
-        except:
-            mb.showerror(
-                "Ошибка", 
-                "Ты ввел данные не того типа!")
-            return False
-
-    def add_record(self):
-        self.add()
-        self.init_table()
-        print(self.df)
-
-    def delete_record(self):
-        df = self.df_list[self.choice_data.get()]
-        entry = int(self.delete_entry.get())
-        if 0 <= entry and entry < df.shape[0]:
-            self.delete(self.choice_data.get(), entry)
-            self.init_table()
-        else:
-            mb.showerror(
-                "Ошибка", 
-                "Ты ввел неверные данные!")
-        self.delete_entry.delete(0, 'end')
-
-
-    def init_menu(self):
-        menu = ttk.Frame(self.manager)
-        menu.grid(column=1, row=0, sticky="nsew")
-
-        label_choose = ttk.Label(menu, text="Выберите базу данных: ")
-        label_choose.grid(column=0, row=0, padx=10, pady=10, sticky="nw")
-
-        row_iter = 0
-
-        for i in range(len(self.df_list)):
-            radiobutton_choice = ttk.Radiobutton(menu, text=self.df_names[i], variable=self.choice_data, value=i, command=self.init_table)
-            radiobutton_choice.grid(column=1, row=row_iter, padx=10, pady=10, sticky="nw")
-            row_iter+=1
-
-        add_button = ttk.Button(menu, text="Добавить", command=self.add_record)
-        add_button.grid(column=0, row=row_iter, padx=10, pady=10, sticky="nw")
-
-        delete_button = ttk.Button(menu, text="Удалить", command=self.delete_record)
-        delete_button.grid(column=1, row=row_iter, padx=10, pady=10, sticky="nw")
-
-        self.delete_entry = ttk.Entry(menu)
-        self.delete_entry.grid(column=2, row=row_iter)
-
-        save_change = ttk.Button(menu, text="Применить изменения", command=self.save_change)
-        save_change.grid(column=3, row=row_iter)
-
-    def get_frame(self):
-        return self.manager
-
-
-def update_df():
-    df = tracks.get_upd_df().merge(albums.get_upd_df(), left_on="Альбом ID", right_on="Альбом ID", how="outer")
-    df = df.merge(artists.get_upd_df(), left_on="Артист ID", right_on="Артист ID", how="outer")
-    df = df.merge(genres.get_upd_df(), left_on="Жанр ID", right_on="Жанр ID", how="outer")
-    print(df)
-    df = df.dropna().reset_index(drop=True)
-    print(df)
-    df_tracks = df[["Название", "Альбом ID", "Прослушиваний"]].drop_duplicates().reset_index(drop=True)
-    df_albums = df[["Название альбома", "Альбом ID", "Жанр ID", "Артист ID", "Стоимость"]].drop_duplicates().reset_index(drop=True)
-    df_artists = df[["Имя артиста", "Артист ID"]].drop_duplicates().reset_index(drop=True)
-    df_genres = df[["Название жанра", "Жанр ID"]].drop_duplicates().reset_index(drop=True)
-
-    df_list = [df_tracks, df_albums, df_artists, df_genres] 
-
-    tracks.df = df_tracks
-    albums.df = df_albums
-    artists.df = df_artists
-    genres.df = df_genres
-
-    select_data.df_list = df_list
-    static_data.df_list = df_list
-    pivot_table.df_list = df_list
-
-    graph_bar.df = df
-    graph_hist.df = df 
-
 root = tk.Tk()
 root.geometry('1200x600+200+150')
 root.title("Менеджер")
 
 n = ttk.Notebook(root, width=root.winfo_screenwidth(), height=root.winfo_screenheight())
 
-data = TableManage(root)
-frame = data.get_frame()
+manager = TableManage(root)
+frame = manager.get_frame()
 
-select_data = SampleData(root, data.df_list, data.df_names, "output/")
-static_data = StaticData(root, data.df_list, data.df_names, "output/")
-pivot_table = PivotTable(root, data.df_list, data.df_names, "output/")
-graph_bar = BarPlot(root, data.df, "graphics/")
-graph_hist = HistPlot(root, data.df, "graphics/")
+select_data = SampleData(root).get_frame()
+static_data = StaticData(root, "output/")
+pivot_table = PivotTable(root, "output/").get_frame()
+graph_bar = BarPlot(root, "graphics/").get_frame()
+graph_hist = HistPlot(root, manager.df, "graphics/")
 
 n.add(frame, text="Данные")
-# n.add(tracks, text='Треки')
-# n.add(albums, text='Альбомы')
-# n.add(artists, text='Артисты')
-# n.add(genres, text='Жанры')
 n.add(select_data, text='Выборка данных')
 n.add(static_data, text='Статистический отчет')
 n.add(pivot_table, text="Сводная таблица")
