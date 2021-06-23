@@ -190,14 +190,16 @@ class TableManage(DataBase):
 
     def save_change(self):
         df = self.table.get_df()
+        init_df = self.df_list[self.choice_data.get()]
+
         if self.check_types(df):
             for i in range(self.df.shape[0]):
-                for column in df.columns:
 
-                    for x, value in enumerate(self.df_list[self.choice_data.get()][column]):
-                        if self.df.iloc[i, self.df.columns.get_loc(column)] == value:
+                for x in range(init_df.shape[0]):
+                    if self.df.loc[i][list(df.columns)].equals(other=init_df.loc[x]):
+                        for column in init_df:
                             self.df.iloc[i, self.df.columns.get_loc(column)] = df[column][x]
-
+                        break
 
             self.define_df()
             self.transform_type()
@@ -255,7 +257,7 @@ class TableManage(DataBase):
             radiobutton_choice.grid(column=1, row=row_iter, padx=10, pady=10, sticky="nw")
             row_iter+=1
 
-        add_button = ttk.Button(menu, text="Добавить", command=self.add_record)
+        add_button = ttk.Button(menu, text="Добавить", command=self.add_record, style='Kim.TButton')
         add_button.grid(column=0, row=row_iter, padx=10, pady=10, sticky="nw")
 
         delete_button = ttk.Button(menu, text="Удалить", command=self.delete_record)
@@ -889,24 +891,24 @@ class BarPlot(DataBase):
         self.df = self.get_full_df()
         self.transform_type()
 
-        #try:
-        plt.style.use('ggplot')
-        plt.rcParams['font.size'] = '7'
+        try:
+            plt.style.use('ggplot')
+            plt.rcParams['font.size'] = '7'
 
-        fig = plt.figure(figsize=(10, 4.4), dpi=100)
+            fig = plt.figure(figsize=(10, 4.4), dpi=100)
 
-        canvas = FigureCanvasTkAgg(fig, master=self.frame)
-        plot_widget = canvas.get_tk_widget()
-        plot_widget.grid(column=0, row=1, padx=20, sticky="e")
+            canvas = FigureCanvasTkAgg(fig, master=self.frame)
+            plot_widget = canvas.get_tk_widget()
+            plot_widget.grid(column=0, row=1, padx=20, sticky="e")
 
-        df = pd.pivot_table(self.df, index=[self.qual_attr.get()], values=[self.quan_attr.get()])
-        ax = fig.add_subplot()  
-        df.plot(kind='barh', legend=True, ax=ax)
-        plt.tight_layout()
-        # except:
-        #     mb.showerror(
-        #         "Ошибка", 
-        #         "Ты ввел неверные данные!")
+            df = pd.pivot_table(self.df, index=[self.qual_attr.get()], values=[self.quan_attr.get()])
+            ax = fig.add_subplot()  
+            df.plot(kind='barh', legend=True, ax=ax)
+            plt.tight_layout()
+        except:
+            mb.showerror(
+                "Ошибка", 
+                "Ты ввел неверные данные!")
         
     def init_manager(self):
         manager = ttk.Frame(self.frame)
