@@ -197,8 +197,6 @@ class TableManage(DataBase):
                     for x, value in enumerate(self.df_list[self.choice_data.get()][column]):
                         if self.df.iloc[i, self.df.columns.get_loc(column)] == value:
                             self.df.iloc[i, self.df.columns.get_loc(column)] = df[column][x]
-                        # if self.df.iloc[i, j] == value:
-                        #     self.df.iloc[i, j] = df[column][x]
 
 
             self.define_df()
@@ -276,10 +274,10 @@ class TableManage(DataBase):
         button_save_csv.grid(column=1, row=row_iter+1, padx=10, pady=10, sticky="e")
 
         button_save_xlsx = ttk.Button(menu, text=".xlsx", command=self.save_as_xlsx)
-        button_save_xlsx.grid(column=2, row=row_iter+1, padx=10, pady=10)
+        button_save_xlsx.grid(column=1, row=row_iter+2, padx=10, pady=10)
 
         button_save_pic = ttk.Button(menu, text=".pic", command=self.save_as_pic)
-        button_save_pic.grid(column=3, row=row_iter+1, padx=10, pady=10)
+        button_save_pic.grid(column=1, row=row_iter+3, padx=10, pady=10)
 
     def get_frame(self):
         return self.manager
@@ -1146,15 +1144,118 @@ class BoxVisk(DataBase):
         return self.frame
 
 class Scatter(DataBase):
-    
+    def __init__(self, parent, file_path):
+        self.df = self.get_full_df()
+
+        self.frame = ttk.Frame(parent)
+
+        self.file_path = file_path
+        
+        self.df_types = self.get_df_types()
+
+        self.qual_attr = tk.StringVar()
+        self.quan_first_attr = tk.StringVar()
+        self.quan_second_attr = tk.StringVar()
+
+        self.define_quality_attr()
+        self.define_quantity_attr()
+        self.init_manager()
+        mt.use('TkAgg')
+
+    def transform_type(self):
+        for i, column in enumerate(self.df.columns):
+            self.df = self.df.astype({column:self.df_types[i]})
+
+    def define_quality_attr(self):
+        self.quality_attributes = []
+        for i in range(len(self.df.columns)):
+            if self.df_types[i] == "O":
+               self.quality_attributes.append(self.df.columns[i])
+
+    def define_quantity_attr(self):
+        self.quantity_attributes = []
+        for i in range(len(self.df.columns)):
+            if self.df_types[i] == "int64" or self.df_types[i] == "float64":
+               self.quantity_attributes.append(self.df.columns[i]) 
+
+    def init_graph(self):
+        self.df = self.get_full_df()
+        self.transform_type()
+        try:
+            plt.style.use('ggplot')
+            plt.rcParams['font.size'] = '7'
+
+            fig = plt.figure(figsize=(10, 4.4), dpi=100)
+
+            canvas = FigureCanvasTkAgg(fig, master=self.frame)
+            plot_widget = canvas.get_tk_widget()
+            plot_widget.grid(column=0, row=1, padx=20, sticky="e")
+
+            names = list(self.df[self.qual_attr.get()].unique())
+            for x in names:
+                values_x = list(self.df[self.df[self.qual_attr.get()] == x][self.quan_first_attr.get()])
+                values_y = list(self.df[self.df[self.qual_attr.get()] == x][self.quan_second_attr.get()])
+                plt.scatter(x=values_x, y=values_y, label=x)
+
+            plt.xlabel(self.quan_first_attr.get())
+            plt.ylabel(self.quan_second_attr.get())
+            plt.legend()
+            plt.tight_layout()
+        except:
+            mb.showerror(
+                "Ошибка", 
+                "Ты ввел неверные данные!")
+        
+    def init_manager(self):
+        manager = ttk.Frame(self.frame)
+        manager.grid(column=0, row=0)
+
+        label_choice = ttk.Label(manager, text="Выберите качественный атрибут: ")
+        label_choice.grid(column=0, row=0, padx=10, pady=10)
+
+        first_choice_rad = ttk.Combobox(manager, textvariable=self.qual_attr, state="readonly", values=self.quality_attributes)
+        first_choice_rad.grid(column=1, row=0, padx=10, pady=10)
+
+        label_choice = ttk.Label(manager, text="Выберите количественные атрибуты: ")
+        label_choice.grid(column=2, row=0, padx=10, pady=10)
+
+        second_choice_rad = ttk.Combobox(manager, textvariable=self.quan_first_attr, state="readonly", values=self.quantity_attributes)
+        second_choice_rad.grid(column=3, row=0, padx=10, pady=10)
+
+        third_choice_rad = ttk.Combobox(manager, textvariable=self.quan_second_attr, state="readonly", values=self.quantity_attributes)
+        third_choice_rad.grid(column=4, row=0, padx=10, pady=10)
+
+        button_apply = ttk.Button(manager, text="Применить", command=self.init_graph)
+        button_apply.grid(column=5, row=0, padx=10, pady=10)
+
+        button_save_csv = ttk.Button(manager, text="Сохранить", command=self.save)
+        button_save_csv.grid(column=6, row=0, padx=10, pady=10, sticky="e")
+
+    def save_default(self):
+        file_name_default = datetime.now().strftime("%Y%m%d-%H%M%S")
+        f_default = self.file_path+file_name_default+".png"
+        plt.savefig(f_default)
+
+    def save(self):
+        file_name = fd.asksaveasfilename(
+            filetypes=(("PNG files", "*.png"),
+                    ("All files", "*.*")))
+        f = open(file_name, 'w')
+        plt.savefig(file_name)
+
+        self.save_default()
+
+    def get_frame(self):
+        return self.frame
+
+
 root = tk.Tk()
 root.geometry('1200x600+200+150')
 root.title("Менеджер")
 
 n = ttk.Notebook(root, width=root.winfo_screenwidth(), height=root.winfo_screenheight())
 
-manager = TableManage(root)
-frame = manager.get_frame()
+manager = TableManage(root).get_frame()
 
 select_data = SampleData(root).get_frame()
 static_data = StaticData(root, "output/")
@@ -1162,14 +1263,16 @@ pivot_table = PivotTable(root, "output/").get_frame()
 graph_bar = BarPlot(root, "graphics/").get_frame()
 graph_hist = HistPlot(root,"graphics/").get_frame()
 graph_box = BoxVisk(root, "graphics/").get_frame()
+graph_scatter = Scatter(root, "graphics/").get_frame()
 
-n.add(frame, text="Данные")
+n.add(manager, text="Данные")
 n.add(select_data, text='Выборка данных')
 n.add(static_data, text='Статистический отчет')
 n.add(pivot_table, text="Сводная таблица")
 n.add(graph_bar, text="Столбчатая диаграмма")
 n.add(graph_hist, text="Гистограмма")
 n.add(graph_box, text="Диаграмма Бокса-Уискера")
+n.add(graph_scatter, text="Диаграмма рассеяния")
 
 n.pack()
 root.mainloop()
