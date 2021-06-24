@@ -9,8 +9,9 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.pyplot as plt
 import matplotlib as mt
 from datetime import datetime
+import config as cfg
 import sys
-sys.path.insert(1, 'D:/Google/University/data_analysis/work')
+sys.path.insert(1, cfg.work_path)
 
 from library.db import *
 
