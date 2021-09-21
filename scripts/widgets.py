@@ -136,7 +136,6 @@ class TableManage(DataBase):
     def add_record(self):
         self.add()
         self.init_table()
-        print(self.df)
 
     def delete_record(self):
         df = self.df_list[self.choice_data.get()]
